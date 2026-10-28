@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05070d">
+<meta name="description" content="Azure Moonlight Resort - an escape point & click adventure set in an abandoned seaside resort.">
+<title>Azure Moonlight Resort — 脱出ゲーム</title>
+<style>
+:root{
+  --gold:#e8c877; --teal:#7fd4e0; --dim:#8d97a8; --bg:#05070d;
+  --panel:rgba(10,14,22,.94); --line:rgba(232,200,119,.35);
+  --touch:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);overflow:hidden}
+body{
+  font-family:"Hiragino Kaku Gothic New","Yu Gothic UI","Segoe UI",system-ui,-apple-system,sans-serif;
+  color:#dfe6ef;user-select:none;-webkit-user-select:none;touch-action:manipulation;
+}
+#frame{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 20%,#0b1120 0%,#04060b 75%)}
+#game{position:relative;width:min(100vw,calc(100vh*1.7778));height:min(100vh,calc(100vw*0.5625));
+  overflow:hidden;background:#080d17;box-shadow:0 0 80px rgba(0,0,0,.8),0 0 0 1px rgba(232,200,119,.08)}
+#scene{position:absolute;inset:0}
+#scene svg{width:100%;height:100%;display:block}
+#scene::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 48%,rgba(2,5,10,.16) 100%),
+    linear-gradient(180deg,rgba(2,5,10,.16),transparent 18%,transparent 72%,rgba(2,5,10,.2))}
+#hotspots{position:absolute;inset:0;pointer-events:none}
+/* ---------- hotspots ---------- */
+.hs{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;
+  border-radius:14px;border:1.5px solid transparent;background:transparent;
+  min-width:34px;min-height:26px;transition:background .25s,border-color .25s,box-shadow .25s}
+.hs::after{content:"";position:absolute;right:-4px;top:-4px;width:9px;height:9px;border-radius:50%;
+  background:var(--gold);box-shadow:0 0 6px 2px rgba(232,200,119,.5),0 0 14px var(--gold);animation:pulse 1.8s infinite;opacity:.9}
+.hs.found::after{width:6px;height:6px;background:#4f7a6a;box-shadow:none;animation:none;opacity:.5}
+.hs:hover,.hs.hl{border-color:var(--gold);background:rgba(232,200,119,.14);box-shadow:0 0 18px rgba(232,200,119,.25)}
+.hs:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.hs.nav{border-radius:50%;width:7.5%;aspect-ratio:1/1;border-color:rgba(127,212,224,.5);
+  background:radial-gradient(circle,rgba(127,212,224,.22),rgba(6,10,18,.62));box-shadow:0 4px 16px rgba(0,0,0,.25);
+  backdrop-filter:blur(3px)}
+.hs.nav:hover,.hs.nav.hl{border-color:var(--teal);background:radial-gradient(circle,rgba(127,212,224,.4),rgba(6,10,18,.72));
+  box-shadow:0 0 22px rgba(127,212,224,.32)}
+.hs.nav::after{display:none}
+.hs.nav::before{content:attr(data-a);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:clamp(16px,3.2vmin,30px);color:var(--teal)}
+@keyframes pulse{0%,100%{transform:scale(.8);opacity:.5}50%{transform:scale(1.25);opacity:1}}
+/* ---------- HUD ---------- */
+#hud{position:absolute;left:0;right:0;bottom:0;padding:1.2vmin 1.6vmin;background:linear-gradient(0deg,rgba(4,7,12,.97) 62%,rgba(4,7,12,.82) 86%,transparent);
+  border-top:1px solid rgba(232,200,119,.12);z-index:20;backdrop-filter:blur(8px)}
+#msg{min-height:5.4vmin;font-size:clamp(12px,2.05vmin,19px);line-height:1.5;color:#f0f3f8;text-shadow:0 2px 8px #000;margin-bottom:.8vmin}
+#msg b{color:var(--gold)}#msg i{color:var(--teal);font-style:normal}
+#invRow{display:flex;gap:1.2vmin;align-items:center;min-height:8vmin;flex-wrap:wrap;padding-top:.7vmin;border-top:1px solid rgba(255,255,255,.08)}
+#inv{display:flex;gap:1vmin;flex-wrap:wrap;flex:1}
+.item{width:8vmin;height:8vmin;min-width:44px;min-height:44px;max-width:64px;max-height:64px;border-radius:10px;
+  border:1.5px solid rgba(210,224,244,.2);background:linear-gradient(145deg,rgba(33,47,68,.96),rgba(10,16,27,.94));
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 14px rgba(0,0,0,.24);cursor:pointer;position:relative;
+  display:flex;align-items:center;justify-content:center;font-size:4vmin;transition:transform .2s,border-color .2s,background .2s,box-shadow .2s}
+.item:hover{border-color:rgba(232,200,119,.55);transform:translateY(-2px)}
+.item.sel{border-color:var(--gold);background:linear-gradient(145deg,rgba(90,72,39,.74),rgba(24,26,30,.96));
+  box-shadow:inset 0 1px rgba(255,255,255,.14),0 0 18px rgba(232,200,119,.32);transform:translateY(-3px)}
+.item .cnt{position:absolute;right:2px;bottom:1px;font-size:1.6vmin;color:var(--dim)}
+#top{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;
+  padding:1.2vmin 1.5vmin;background:linear-gradient(180deg,rgba(4,7,12,.72),rgba(4,7,12,.34) 72%,transparent);
+  z-index:20;pointer-events:none}
+#roomName{font-size:clamp(11px,1.9vmin,17px);letter-spacing:.12em;color:var(--teal);text-shadow:0 1px 4px #000;opacity:.98;
+  padding:.75vmin 1.1vmin;border-left:2px solid var(--teal);border-radius:0 8px 8px 0;background:rgba(7,13,22,.62);
+  box-shadow:0 4px 16px rgba(0,0,0,.2)}
+#menu{display:flex;gap:.65vmin;flex-wrap:wrap;justify-content:flex-end;pointer-events:auto;max-width:78%}
+.mb{font-size:clamp(10px,1.7vmin,15px);padding:.9vmin 1.4vmin;min-height:36px;border-radius:8px;cursor:pointer;
+  background:linear-gradient(180deg,rgba(20,29,44,.9),rgba(7,12,21,.9));border:1px solid rgba(210,224,244,.2);
+  color:#e6ecf5;box-shadow:0 3px 12px rgba(0,0,0,.18);transition:transform .18s,border-color .18s,color .18s,background .18s}
+.mb:hover{border-color:var(--line);color:var(--gold);background:linear-gradient(180deg,rgba(47,54,62,.92),rgba(17,22,30,.94));transform:translateY(-1px)}
+.mb.on{border-color:var(--gold);color:var(--gold);box-shadow:0 0 12px rgba(232,200,119,.18)}
+.mb:focus-visible,.btn:focus-visible,.dbtn:focus-visible,.pkey:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+/* ---------- screens / overlays ---------- */
+.screen{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 36%,rgba(24,38,61,.78),rgba(4,7,13,.96) 76%),linear-gradient(180deg,rgba(4,7,13,.9),rgba(4,7,13,.97));
+  padding:3vmin;text-align:center;backdrop-filter:blur(4px)}
+.screen h1{font-size:clamp(22px,5.4vmin,54px);color:var(--gold);letter-spacing:.08em;margin-bottom:1.5vmin;text-shadow:0 0 30px rgba(232,200,119,.3)}
+.screen h2{font-size:clamp(16px,3.4vmin,32px);color:var(--gold);margin-bottom:1.6vmin}
+.screen p{font-size:clamp(11px,2.1vmin,19px);color:#cfd8e4;line-height:1.7;max-width:78ch;margin-bottom:1.4vmin}
+.screen .small{font-size:clamp(9px,1.6vmin,14px);color:var(--dim)}
+.btn{margin:.8vmin;padding:1.4vmin 3.2vmin;font-size:clamp(12px,2.2vmin,20px);border-radius:10px;cursor:pointer;
+  background:linear-gradient(180deg,#283a56,#101a2b);color:var(--gold);border:1px solid var(--line);min-height:var(--touch);
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.24);transition:transform .18s,background .18s,box-shadow .18s}
+.btn:hover{background:linear-gradient(180deg,#344b6c,#17253a);box-shadow:0 0 18px rgba(232,200,119,.25);transform:translateY(-1px)}
+.btn.ghost{color:#c3ccd8;border-color:rgba(255,255,255,.2)}
+#titleArt{width:min(88%,72vh);margin-bottom:2vmin;pointer-events:none}
+#endArt{width:min(70%,52vh);margin-bottom:1vmin}
+.ov{position:absolute;inset:0;z-index:50;background:rgba(4,6,11,.86);display:flex;align-items:center;justify-content:center;padding:2vmin}
+.panel{background:linear-gradient(145deg,rgba(19,27,41,.97),rgba(7,11,19,.98));border:1px solid var(--line);border-radius:16px;
+  padding:2.4vmin 2.8vmin;max-width:min(92%,820px);max-height:92%;overflow:auto;position:relative;
+  box-shadow:0 22px 70px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.05);backdrop-filter:blur(14px)}
+.panel h3{color:var(--gold);font-size:clamp(13px,2.6vmin,24px);margin-bottom:1.4vmin;letter-spacing:.06em}
+.xclose{position:absolute;top:1.2vmin;right:1.4vmin;font-size:clamp(14px,2.6vmin,24px);color:#9aa6b6;cursor:pointer;padding:.6vmin}
+.xclose:hover{color:var(--gold)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1vmin}
+.jcell{font-size:clamp(10px,1.8vmin,15px);padding:1vmin 1.2vmin;border:1px solid rgba(255,255,255,.14);border-radius:8px;background:rgba(255,255,255,.04)}
+.jcell.on{border-color:var(--line);color:var(--gold)}
+.jcell.off{color:#49525f}
+.mzTitle{color:var(--teal);font-size:clamp(10px,1.9vmin,16px);margin:1.4vmin 0 .6vmin;letter-spacing:.1em}
+/* ---------- locks ---------- */
+.dialrow{display:flex;gap:2vmin;justify-content:center;margin:2vmin 0}
+.dial{text-align:center}
+.dbtn{width:11vmin;min-width:52px;height:7vmin;min-height:40px;font-size:2vmin;border-radius:8px;cursor:pointer;
+  background:#182438;color:var(--teal);border:1px solid rgba(127,212,224,.4)}
+.dnum{font-size:clamp(22px,6vmin,52px);font-family:monospace;color:var(--gold);margin:.8vmin 0;text-shadow:0 0 14px rgba(232,200,119,.4)}
+.jrow{display:flex;align-items:center;gap:1.4vmin;padding:1vmin;border:1px solid rgba(255,255,255,.14);border-radius:8px;margin:.7vmin 0;cursor:pointer}
+.jrow:hover{border-color:var(--line)}
+.jrow.act{background:rgba(232,200,119,.14);border-color:var(--gold)}
+.jnum{width:8vmin;min-width:40px;height:8vmin;min-height:40px;border-radius:50%;border:1.5px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;font-size:2.6vmin;color:var(--gold);background:rgba(232,200,119,.1)}
+.keys{display:flex;gap:.8vmin;justify-content:center;margin:2vmin 0}
+.pkey{width:9vmin;min-width:44px;height:12vmin;min-height:56px;border-radius:0 0 8px 8px;background:linear-gradient(180deg,#f2efe6 0 60%,#cfc7b2 60% 78%,#f2efe6 78%);
+  border:1px solid #8d8672;color:#333;font-size:2.2vmin;cursor:pointer;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.8vmin}
+.pkey.on{background:linear-gradient(180deg,#ffe9a8 0 60%,#e3c66f 60% 78%,#ffe9a8 78%);border-color:var(--gold);box-shadow:0 0 16px rgba(232,200,119,.5)}
+.pkey.black{background:linear-gradient(180deg,#2a2f3a 0 62%,#1a1e26 62% 80%,#2a2f3a 80%);border-color:#454c59}
+.seqline{text-align:center;font-size:clamp(12px,2.4vmin,20px);color:var(--teal);min-height:2.4em;letter-spacing:.35em}
+.fuses{display:flex;gap:2vmin;justify-content:center;margin:2vmin 0}
+.fuse{width:12vmin;min-width:64px;height:16vmin;min-height:84px;border-radius:10px;border:2px solid #4b5568;background:#0d1420;
+  display:flex;align-items:center;justify-content:center;font-size:2vmin;color:#63708a;cursor:pointer}
+.fuse.has{border-color:var(--teal);color:var(--teal);background:rgba(127,212,224,.08)}
+.fuse.empty{border-style:dashed;border-color:#7c5b2a;color:#a97e3d}
+/* rotate hint */
+#rotate{position:fixed;inset:0;z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;
+  background:#05070d;text-align:center;padding:6vmin}
+#rotate svg{width:min(50vw,200px);margin-bottom:4vmin;animation:rot 2.4s ease-in-out infinite}
+#rotate p{font-size:clamp(13px,4vw,20px);color:var(--gold);line-height:1.6}
+@keyframes rot{0%,20%{transform:rotate(0)}55%,80%{transform:rotate(90deg)}100%{transform:rotate(0)}}
+@media (orientation:portrait){#rotate.show{display:flex}}
+/* beam + misc anims */
+.beamsw{transform-box:fill-box;transform-origin:0 50%;animation:sway 7s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(14deg)}}
+.twinkle{animation:tw 3.4s infinite}
+@keyframes tw{0%,100%{opacity:.9}50%{opacity:.25}}
+.waterSh{animation:wsh 6s ease-in-out infinite}
+@keyframes wsh{0%,100%{transform:translateX(0)}50%{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){.beamsw,.twinkle,.waterSh,.hs::after{animation:none}}
+</style>
+</head>
+<body>
+<div id="frame"><div id="game">
+  <div id="scene"></div>
+  <div id="hotspots"></div>
+  <div id="top">
+    <div id="roomName"></div>
+    <div id="menu">
+      <button class="mb" id="bMap"></button>
+      <button class="mb" id="bJournal"></button>
+      <button class="mb" id="bHint"></button>
+      <button class="mb" id="bHelp">?</button>
+      <button class="mb" id="bSound"></button>
+      <button class="mb" id="bLang"></button>
+      <button class="mb" id="bSave"></button>
+      <button class="mb" id="bTitle"></button>
+    </div>
+  </div>
+  <div id="hud">
+    <div id="msg"></div>
+    <div id="invRow"><div id="inv"></div></div>
+  </div>
+  <div class="screen" id="scrTitle"></div>
+  <div class="screen" id="scrEnd" style="display:none"></div>
+  <div class="ov" id="overlay" style="display:none"><div class="panel" id="ovPanel"></div></div>
+</div></div>
+<div id="rotate"><svg viewBox="0 0 100 100"><rect x="35" y="12" width="30" height="62" rx="6" fill="none" stroke="#e8c877" stroke-width="3"/><rect x="40" y="18" width="20" height="44" rx="2" fill="#182438"/><circle cx="50" cy="85" r="3" fill="#7fd4e0"/></svg><p id="rotTxt"></p></div>
+<script>
+"use strict";
+/* =================================================================
+   AZURE MOONLIGHT RESORT — single-file escape game
+   ================================================================= */
+const SAVEKEY='azurescape_v1', W=1600, H=900;
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+function T(o){return (o&&typeof o==='object')?(o[LANG()]):o;}
+function LANG(){return G?G.lang:((navigator.language||'en').toLowerCase().indexOf('ja')===0?'jp':'en');}
+function fl(f){return !!G.flags[f];}
+function sf(f,v=true){G.flags[f]=v;autosave();}
+function has(id){return G.inv.includes(id);}
+function give(id){if(!G.inv.includes(id)){G.inv.push(id);sfxPickup();autosave();renderInv();}}
+function take(id){const i=G.inv.indexOf(id);if(i>=0)G.inv.splice(i,1);sel=null;autosave();renderInv();}
+function nav(r){G.room=r;sf('v_'+r);closeOv();sel=null;render();autosave();}
+let msgTimer=null;
+function say(txt,ms=9000){
+  const m=$('#msg');m.innerHTML=T(txt);
+  if(msgTimer)clearTimeout(msgTimer);
+  msgTimer=setTimeout(()=>{m.innerHTML='';},ms);
+}
+function mark(id){if(!G.seen.includes(id)){G.seen.push(id);autosave();}}
+function isSeen(id){return G.seen.includes(id);}
+function setFlagDone(f){sf(f,true);}
+
+/* ---------------- state ---------------- */
+let G=null, sel=null;
+function fresh(){return{
+  room:'lobby',flags:{},inv:[],seen:[],lang:navigator.language&&navigator.language.toLowerCase().startsWith('ja')?'jp':'en',
+  sound:true,found:{},endings:[],t0:Date.now(),started:Date.now()
+};}
+
+/* ---------------- save / load ---------------- */
+function autosave(){try{if(G&&G.started)localStorage.setItem(SAVEKEY,JSON.stringify(G));}catch(e){}}
+function getSave(){try{const s=localStorage.getItem(SAVEKEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+function wipeSave(){try{localStorage.removeItem(SAVEKEY);}catch(e){}}
+
+/* ---------------- audio ---------------- */
+let AC=null,mg=null,ambOn=false;
+function ac(){
+  if(!AC){
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    mg=AC.createGain();mg.gain.value=0;mg.connect(AC.destination);
+  }
+  if(AC.state==='suspended')AC.resume();
+  if(G&&G.sound){
+    mg.gain.setTargetAtTime(.6,AC.currentTime,.3);
+    startAmb();
+  }
+  return AC;
+}
+function noiseBuf(a){
+  const b=a.createBuffer(1,a.sampleRate*3,a.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;
+}
+function startAmb(){
+  if(ambOn||!AC)return;ambOn=true;
+  const a=AC,b=a.createBufferSource();b.buffer=noiseBuf(a);b.loop=true;
+  const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=430;
+  const g=a.createGain();g.gain.value=.09;
+  const lfo=a.createOscillator();lfo.frequency.value=.08;
+  const lg=a.createGain();lg.gain.value=.05;lfo.connect(lg);lg.connect(g.gain);
+  b.connect(lp);lp.connect(g);g.connect(mg);
+  const b2=a.createBufferSource();b2.buffer=b.buffer;b2.loop=true;
+  const bp=a.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1600;bp.Q.value=.6;
+  const g2=a.createGain();g2.gain.value=.028;
+  const l2=a.createOscillator();l2.frequency.value=.031;const l2g=a.createGain();l2g.gain.value=.02;
+  l2.connect(l2g);l2g.connect(g2.gain);
+  b2.connect(bp);bp.connect(g2);g2.connect(mg);
+  b.start();b2.start();lfo.start();l2.start();
+}
+function tone(f0,f1,dur,type,vol,dt=0){
+  if(!G||!G.sound)return;const a=ac();
+  const o=a.createOscillator(),g=a.createGain();o.type=type;
+  const t=a.currentTime+dt;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+  o.connect(g);g.connect(mg);o.start(t);o.stop(t+dur+.05);
+}
+function nburst(f0,f1,dur,vol,type='bandpass',dt=0){
+  if(!G||!G.sound)return;const a=ac();
+  const b=a.createBufferSource();b.buffer=noiseBuf(a);
+  const bp=a.createBiquadFilter();bp.type=type;
+  const t=a.currentTime+dt;bp.frequency.setValueAtTime(f0,t);bp.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  const g=a.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+  b.connect(bp);bp.connect(g);g.connect(mg);b.start(t);b.stop(t+dur+.05);
+}
+function sfxClick(){tone(760,520,.05,'triangle',.14);}
+function sfxDeny(){tone(220,140,.18,'sawtooth',.16);tone(160,110,.2,'sawtooth',.12,.08);}
+function sfxPickup(){tone(660,664,.09,'triangle',.16);tone(880,884,.1,'triangle',.16,.09);tone(1320,1326,.14,'triangle',.14,.18);}
+function sfxSolved(){[523,659,784,1046].forEach((f,i)=>tone(f,f*1.002,.28,'triangle',.16,i*.11));nburst(3000,1200,.5,.05);}
+function sfxDoor(){nburst(420,150,.35,.22,'lowpass');tone(130,55,.4,'sine',.2);}
+function sfxCreak(){nburst(1500,420,.55,.09,'bandpass');}
+function sfxSplash(){nburst(1100,300,.35,.16);}
+function sfxThunder(){nburst(220,42,.9,.3,'lowpass');tone(62,30,1.1,'sine',.22);}
+function sfxBeam(){tone(90,1150,1.3,'sine',.2);nburst(800,4000,1.2,.07,'highpass');}
+
+/* ---------------- toggle sound ---------------- */
+function setSound(on){
+  G.sound=on;
+  if(on){ac();startAmb();if(mg)mg.gain.setTargetAtTime(.6,AC.currentTime,.3);}
+  else if(mg){mg.gain.setTargetAtTime(0,AC.currentTime,.15);}
+  $('#bSound').textContent=T(UI.snd)+(on?' ON':' OFF');
+  $('#bSound').classList.toggle('on',on);
+  autosave();
+}
+
+/* ---------------- UI strings ---------------- */
+const UI={
+  gameTitle:{en:'AZURE MOONLIGHT RESORT',jp:'Azure月光リゾート'},
+  tagline:{en:'A point & click escape in an abandoned seaside resort',jp:'廃墟リゾートを舞台にしたポイント＆クリック脱出ゲーム'},
+  cont:{en:'CONTINUE',jp:'つづきから'},
+  nw:{en:'NEW GAME',jp:'新しい物語'},
+  begin:{en:'BEGIN',jp:'はじめる'},
+  introT:{en:'MAROONED',jp:'置き去り'},
+  intro:{en:"You wake on the dusty floor of a resort lobby. You don't remember boarding the last ferry — and you certainly don't remember staying when it left.\n\nThe Azure Bay Resort closed in 1998, yet tonight every room smells of fresh paint, and a lighthouse blinks uselessly across the bay. The next boat: two days from now… if anyone bothers to look for you.\n\nLight the lighthouse, ready the boat, and get out alive.",
+       jp:"埃っぽく静まり返ったリゾートのロビーで目が覚めた。最後のフェリーに乗った記憶もない。それが港を出た後も、もちろんここに留まった記憶もない。\n\nAzureベイリゾートは1998年に閉業したはずだ。それなのに今夜、どの部屋も絵の具の匂いがし、湾の向こうの灯台は無意味に明滅している。次の船は2日後——誰かがここに自分を探しに来てくれるなら、だが。\n\n灯台に灯をともし、ボートを仕度し、生きたままここを出ろ。"},
+  back:{en:'Close',jp:'とじる'},
+  map:{en:'Map',jp:'地図'},
+  journal:{en:'Journal',jp:'記録'},
+  hint:{en:'Hint',jp:'ヒント'},
+  save:{en:'Save',jp:'保存'},
+  snd:{en:'Sound',jp:'音'},
+  lang:{en:'EN',jp:'日本語'},
+  quit:{en:'Title',jp:'タイトル'},
+  rot:{en:'Please turn your device sideways.\n(横長方向にしてください)',jp:'端末を横長方向にしてください。\n(Please turn your device sideways)'},
+  mapT:{en:'MAP — tap a place you have found',jp:'地図 — 見つけた場所をタップ'},
+  jT:{en:'JOURNAL',jp:'発見記録'},
+  found:{en:'discoveries',jp:'発見'},
+  nothing:{en:'Nothing useful.',jp:'特に何もなさそうだ。'},
+  useIt:{en:'',jp:''},
+  locked:{en:'Locked tight.',jp:'固く閉ざされている。'},
+  needIt:{en:'Maybe something could help here…',jp:'ここは何かで開きそうだ…'},
+  ok:{en:'OPEN IT',jp:'開ける'},
+  reset:{en:'Reset',jp:'やり直す'},
+  lockT:{en:'Enter the number',jp:'数字を合わせろ'},
+  solved:{en:'It clicks open.',jp:'カチリ、と解錠音が響いた。'},
+  wrong:{en:'Nope. Wrong number.',jp:'違う。数字を直せ。'},
+  noSave:{en:'No save data yet.',jp:'セーブデータがありません。'},
+  saved:{en:'Progress saved locally.',jp:'この端末に保存しました。'},
+  newQ:{en:'Start a new story? Current local save will be overwritten.',jp:'新しい物語を始めますか？ 現在のローカルデータは上書きされます。'},
+  helpT:{en:'HOW TO PLAY',jp:'遊び方'},
+  help:{en:'◆ TAP anything marked with a gold dot to examine or pick it up.\n◆ TAP an item in the bottom bar to select it, then TAP the place you want to use it.\n◆ TAP the glowing arrows (or the MAP button) to move between rooms.\n◆ Progress is saved automatically to this device. SOUND can be turned ON/OFF, and 日本語 / English can be switched any time.\n◆ Stuck? Use HINT. Locked codes are always written somewhere in the resort.',
+      jp:'◆ 金色の点が付いた場所をタップして調べたり拾ったりします。\n◆ 下の欄のアイテムをタップして選び、使いたい場所をタップします。\n◆ 光る矢印（または 地図ボタン）で部屋を移動します。\n◆ 進行はこの端末に自動保存されます。音はON／OFF、日本語／Englishの切り替えはいつでもできます。\n◆ 詰まったらヒントを。暗証番号は必ずリゾート内のどこかに書かれています。'},
+  titleQ:{en:'Return to title? Your progress is saved.',jp:'タイトルに戻りますか？ 進行は保存されています。'},
+  endStay:{en:'Keep exploring the resort',jp:'リゾートを探検続ける'},
+  endNew:{en:'NEW GAME',jp:'新しい物語'},
+  timeStat:{en:'Time',jp:'プレイ時間'},
+  discStat:{en:'Discoveries',jp:'発見'},
+  rank:{en:'Rank',jp:'評価'},
+  endBack:{en:'to be continued…',jp:'— つづく —'},
+  pickHint:{en:'Got it: ',jp:'入手した: '},
+  rotate:0
+};
+const HINTS=[
+ {c:()=>!fl('boards'),t:{en:'The lobby’s beach doors are nailed shut. Somewhere outside there should be a tool — look in the boathouse, down the beach path.',jp:'ロビーのビーチ側ドアは板で固く封鎖されている。外側のどこかに道具があるはずだ——ボートガレージを探せ。'}},
+ {c:()=>!has('batteries'),t:{en:'Dead appliances need fresh batteries. The kitchen fridge keeps a sealed pack.',jp:'切れた機器には新品の電池。キッチンの冷蔵庫に未開封のそれが残っている。'}},
+ {c:()=>!(fl('caveopen')&&has('batteries')),t:{en:'Clear the rocks at the cave mouth with the crowbar, then put the batteries in your flashlight before going in.',jp:'岩の口の岩をバールで撤去し、懐中電灯に電池を入れてから洞窟へ。'}},
+ {c:()=>!(has('uvbulb')&&has('fuse')),t:{en:'Inside the cave there is gear in a dry box and under a stone — take both.',jp:'洞窟の奥、防水ケースと石の下に装備品がある。両方持っていけ。'}},
+ {c:()=>!fl('fuseok'),t:{en:'The generator room has a fuse panel with one empty slot. Fit the spare fuse, then push the breaker.',jp:'発電機室のヒューズ盤に欠番がある。予備ヒューズを差し、ブレーキを入れろ。'}},
+ {c:()=>!fl('fuel'),t:{en:'The generator tank is dry. An oil can may be hanging in the boathouse.',jp:'発電機のタンクが空だ。ボートガレージにオイル缶が掛かっているはず。'}},
+ {c:()=>!has('matchbox'),t:{en:'A pool bar needs a pool table — and a matchbox for the lantern. The beach and the bar both smell of smoke.',jp:'バーのランプに火が必要だ。マッチ箱はビーチとバーのどちらかにある。'}},
+ {c:()=>!fl('breakopen'),t:{en:'The breaker cabinet is padlocked. A crowbar ends arguments like that.',jp:'ブレーカー盤は南京錠だ。バールで話に決着をつけろ。'}},
+ {c:()=>!has('cashkey'),t:{en:'The register key is hidden in a guest room. Room 205’s music box opens when played the resort theme — the radio in 201 remembers it.',jp:'金庫の鍵は客室に隠されている。205号室のオルゴールを「リゾートのテーマ」で鳴らせ。201号室のラジオがその曲を知っている。'}},
+ {c:()=>!fl('wallnum'),t:{en:'Some walls were written on with special ink. Shine the UV torch on the dark wall of room 205.',jp:'特別なインクで書かれた壁がある。205号室の暗い壁にUVを当てろ。'}},
+ {c:()=>!fl('safeopen'),t:{en:'The office safe takes three numbers. The resort has worn that code on its wrist since 1998.',jp:'事務所の金庫は3桁。リゾートは1998年から同じ番号を腕に巻きつけている。'}},
+ {c:()=>!has('lhkey'),t:{en:'Inside the safe: a heavy key stamped “LIGHT”. It fits the lighthouse door.',jp:'金庫の中には「LIGHT」と刻まれた重たい鍵。灯台の扉に適合する。'}},
+ {c:()=>!fl('beam'),t:{en:'Generator running? Then climb the lighthouse and throw the master switch.',jp:'発電機が動いているなら、灯台に登りメインスイッチを入れろ。'}},
+ {c:()=>!(fl('bp')&&fl('bf')&&fl('bk')),t:{en:'The moored boat needs three things: a patched hull, a full tank, and an engine key. Look in the register drawer, the pool skimmer and the boathouse.',jp:'係留されたボートには3つ必要だ: 船体の補修、満タン、エンジンキー。出納台の引き出し、プールのスキマー、ボートガレージを探せ。'}},
+ {c:()=>true,t:{en:'Everything is ready. Cast off from the pier — and let the light guide you home.',jp:'準備は整った。桟橋から出航し、灯りに帰り道を示させろ。'}}
+];
+/* ---------------- items ---------------- */
+const ITEMS={
+ flashlight:{g:'🔦',n:{en:'Flashlight',jp:'懐中電灯'},d:{en:'A heavy old flashlight. The batteries are dead.',jp:'古い大型の懐中電灯。電池が切れている。'}},
+ batteries:{g:'🔋',n:{en:'Batteries',jp:'単三電池'},d:{en:'A pair of D batteries, still wrapped.',jp:'未使用の単三電池。2本セット。'}},
+ flash:{g:'💡',n:{en:'Flashlight (on)',jp:'懐中電灯（点灯）'},d:{en:'Bright enough to face the dark.',jp:'暗闇を切り裂ける明るい光。'}},
+ uvbulb:{g:'🟣',n:{en:'UV bulb',jp:'ブラックライト球'},d:{en:'A small violet bulb from a waterproof box.',jp:'防水ケースに入っていた紫の小さな電球。'}},
+ uv:{g:'🔮',n:{en:'UV torch',jp:'ブラックライト'},d:{en:'Shine it on walls inked with secret marks.',jp:'特別なインクの文字を浮かび上がらせる。'}},
+ crowbar:{g:'🛠️',n:{en:'Crowbar',jp:'バール'},d:{en:'Pry, pull, break. A universal key.',jp:'こじり、剥がし、破壊する。万能の鍵。'}},
+ matchbox:{g:'🎋',n:{en:'Matchbox',jp:'マッチ箱'},d:{en:'Almost dry. Four matches left.',jp:'ほぼ乾いている。マッチは4本。'}},
+ rod:{g:'🎣',n:{en:'Fishing rod',jp:'釣竿'},d:{en:'Bamboo rod with a blunt hook.',jp:'竹の釣竿。針は丸まっている。'}},
+ bait:{g:'🪱',n:{en:'Bread & worm',jp:'パンとミミズ'},d:{en:'Bread with a wriggling worm pinned on.',jp:'ミミズを刺したパン切れ。最強の餌。'}},
+ fish:{g:'🐟',n:{en:'Fish',jp:'魚'},d:{en:'Still flapping. Smells like leverage.',jp:'まだびくつかせている。何かの役に立ちそうな匂い。'}},
+  bread:{g:'🍞',n:{en:'Bread heel',jp:'パンの耳'},d:{en:'Soft, wrong, and somehow fresh. Bait, if you think like a fish.',jp:'柔らかくて、おかしくて、なぜか新鮮。魚の考え方をすれば餌になる。'}},
+ cashkey:{g:'🗝️',n:{en:'Register key',jp:'出納台の鍵'},d:{en:'Small brass key marked CASH.',jp:'「CASH」と刻まれた真鍮の小さな鍵。'}},
+ officekey:{g:'🔑',n:{en:'Office key',jp:'事務室の鍵'},d:{en:'Heavy iron key marked OFFICE.',jp:'「OFFICE」と刻まれた重厚な鉄鍵。'}},
+ patch:{g:'🩹',n:{en:'Hull patch',jp:'船体補修板'},d:{en:'Rubber sheet, brass screws, a smiley doodle.',jp:'ゴム板と真鍮ネジ。落書きにスマイル。'}},
+ ekey:{g:'⚙️',n:{en:'Engine key',jp:'エンジンキー'},d:{en:'A T-handle for the outboard motor.',jp:'船外機用のT型ハンドル。'}},
+ jerry:{g:'⛽',n:{en:'Fuel can',jp:'ガソリン缶'},d:{en:'Half a tank of petrol, sealed tight.',jp:'半分ほどのガソリン。蓋は固く閉じている。'}},
+ fuse:{g:'🧨',n:{en:'Spare fuse',jp:'予備ヒューズ'},d:{en:'Ceramic fuse, 30 amps.',jp:'陶器のヒューズ。30アンペア。'}},
+ lhkey:{g:'🗼',n:{en:'Lighthouse key',jp:'灯台の鍵'},d:{en:'A long key stamped LIGHTHOUSE.',jp:'「LIGHTHOUSE」と刻まれた長い鍵。'}},
+ oil:{g:'🛢️',n:{en:'Oil can',jp:'オイル缶'},d:{en:'Diesel oil, sloshing politely.',jp:'軽油。中で上品に音を立てている。'}}
+};
+function nameOf(i){return T(ITEMS[i].n);}
+function no(id){return !has(id)&&!fl('loot_'+id);}
+function looted(id){sf('loot_'+id,true);}
+/* ---------------- lock widgets ---------------- */
+function openOv(html){$('#ovPanel').innerHTML='<span class="xclose" onclick="closeOv()">✕</span>'+html;$('#overlay').style.display='flex';}
+function closeOv(){$('#overlay').style.display='none';$('#ovPanel').innerHTML='';}
+function numLock(title,code,onSolve,triesTxt){
+  const cur=[0,0,0];
+  openOv('<h3>'+title+'</h3><div class="dialrow">'+[0,1,2].map(i=>
+    '<div class="dial"><button class="dbtn" data-u="'+i+'">▲</button><div class="dnum" id="dn'+i+'">0</div><button class="dbtn" data-d="'+i+'">▼</button></div>').join('')+'</div>'+
+    '<div style="text-align:center"><button class="btn" id="dotry">'+T(UI.ok)+'</button></div>');
+  const upd=()=>{for(let i=0;i<3;i++)$('#dn'+i).textContent=cur[i];};
+  const add=(i,d)=>{cur[i]=(cur[i]+d+10)%10;upd();sfxClick();};
+  $$('#ovPanel .dbtn').forEach(b=>b.onclick=()=>add(+ (b.dataset.u!==undefined?b.dataset.u:b.dataset.d), b.dataset.u!==undefined?1:-1));
+  $('#dotry').onclick=()=>{
+    if(cur.join('')===code){sfxSolved();closeOv();onSolve();}
+    else{sfxDeny();say(triesTxt||T(UI.wrong));}
+  };
+  upd();
+}
+function poolLock(onSolve){
+  const tgt=['Blue Moon','Sea Shell','Night Ferry','Anchor Man'];
+  const bands=[tgt[2],tgt[0],tgt[3],tgt[1]];
+  let order=[];
+  openOv('<h3>'+T({en:'Jukebox: play the house hit “Azure Moon”',jp:'ジュークボックス: 館のヒットナンバー「Azure Moon」を流せ'})+'</h3>'+
+   '<p class="small">'+T({en:'Tap four bands in the order their names combine into the song.',jp:'4つのバンド名を、曲名に繋がる順にタップしろ。'})+'</p>'+
+   bands.map((b,i)=>'<div class="jrow" data-b="'+i+'"><span class="jnum" id="jn'+i+'">'+(i+1)+'</span>'+b+'</div>').join('')+
+   '<div style="margin-top:1.6vmin;text-align:center"><span id="jmsg" class="small"></span><button class="btn ghost" id="jrst">'+T(UI.reset)+'</button></div>');
+  const paint=()=>{bands.forEach((b,i)=>{const el=$('#jn'+i);el.textContent=order.indexOf(i)>=0?(order.indexOf(i)+1):(i+1);
+    el.closest('.jrow').classList.toggle('act',order.indexOf(i)>=0);});};
+  $$('#ovPanel .jrow').forEach(r=>r.onclick=()=>{const i=+r.dataset.b;
+    if(order.includes(i)){sfxClick();return;}
+    order.push(i);sfxClick();paint();
+    if(order.length===4){
+      if(order.every((v,k)=>v===k)){setTimeout(()=>{sfxSolved();closeOv();onSolve();},350);}
+      else{setTimeout(()=>{sfxDeny();$('#jmsg').textContent=T({en:'The jukebox grinds and spits the record out.',jp:'ジュークボックスは唸ってレコードを吐き出した。'});order=[];paint();},650);}
+    }});
+  $('#jrst').onclick=()=>{order=[];paint();sfxClick();};
+  paint();
+}
+function musicLock(onSolve){
+  const seq=['C','E','G','E','C','E'];
+  const keys=['C','D','E','F','G','A'];let cur=[];
+  const draw=()=>{$$('#ovPanel .pkey').forEach(k=>k.classList.toggle('on',cur.includes(keys.indexOf(+k.dataset.k))));};
+  openOv('<h3>'+T({en:'Music box — turn the cylinder to match the tune',jp:'オルゴール — シリンダーを回してメロディを合わせろ'})+'</h3>'+
+   '<p class="small">'+T({en:'Six notes. The resort theme. (C = do)',jp:'6つの音。リゾートのテーマ。（C=ド）'})+'</p>'+
+   '<div class="keys">'+keys.map((k,i)=>'<button class="pkey'+(keys.indexOf(k)%2?' black':'')+'" data-k="'+i+'">'+k+'</button>').join('')+'</div>'+
+   '<div class="seqline" id="mseq">&nbsp;</div>'+
+   '<div style="text-align:center"><button class="btn ghost" id="mrst">'+T(UI.reset)+'</button></div>');
+  $$('#ovPanel .pkey').forEach(b=>b.onclick=()=>{
+    if(cur.length>=6)return;
+    cur.push(+b.dataset.k);tone(261.63*Math.pow(2,[0,2,4,5,7,9][+b.dataset.k]/12),0,.5,'triangle',.2);
+    $('#mseq').textContent=cur.map(i=>keys[i]).join(' ');draw();
+    if(cur.length===6){
+      if(cur.map(i=>keys[i]).join('')===seq.join('')){setTimeout(()=>{sfxSolved();closeOv();onSolve();},350);}
+      else{setTimeout(()=>{sfxDeny();say(T({en:'A wrong note. The cylinder springs back.',jp:'不協和音。シリンダーは元に戻る。'}));cur=[];$('#mseq').innerHTML='&nbsp;';draw();},650);}
+    }});
+  $('#mrst').onclick=()=>{cur=[];$('#mseq').innerHTML='&nbsp;';draw();};
+}
+function fusePanel(onInstall){
+  openOv('<h3>'+T({en:'Fuse panel',jp:'ヒューズ盤'})+'</h3>'+
+   '<p class="small">'+T({en:'One socket is empty.',jp:'1つ、欠番がある。'})+'</p>'+
+   '<div class="fuses"><div class="fuse has">30A</div><div class="fuse empty" id="fslot">'+T({en:'EMPTY',jp:'欠番'})+'</div><div class="fuse has">30A</div></div>'+
+   '<p class="small" id="fnote"></p>');
+  $('#fslot').onclick=()=>{
+    if(has('fuse')){$('#fslot').textContent='30A';$('#fslot').classList.add('has');$('#fslot').classList.remove('empty');
+      take('fuse');sfxSolved();onInstall();}
+    else{$('#fnote').textContent=T({en:'You need a spare fuse somewhere.',jp:'予備ヒューズが必要だ。'})+' '+T({en:'(It came from the dark…)',jp:'（暗いところから出てきたはず…）'});sfxDeny();}
+  };
+}
+/* ---------------- render engine ---------------- */
+function render(){
+  const r=ROOMS[G.room];
+  $('#scene').innerHTML=art(G.room);
+  renderHots(r);
+  $('#roomName').textContent=T(r.n);
+  renderInv();
+}
+function art(id){return ROOMS[id].a();}
+function renderHots(r){
+  const box=$('#hotspots');box.innerHTML='';
+  (r.h||[]).forEach((h,i)=>{
+    if(h.cond&&!h.cond())return;
+    const k=G.room+':'+i;
+    if(h.done&&fl(h.done)&&!h.rep)return;
+    hsEl(h,k,i);
+  });
+  (r.nav||[]).forEach(n=>{
+    if(n.cond&&!n.cond())return;
+    hsEl({nav:n.to,x:n.x,y:n.y,a:n.a}, 'nav:'+n.to);
+  });
+}
+function hsEl(h,k,i){
+  const d=document.createElement('div');
+  d.className='hs'+((h.done&&fl(h.done))?' found':'')+(h.nav?' nav':'')+(hlOn?' hl':'');
+  d.style.left=h.x+'%';d.style.top=h.y+'%';d.style.width=(h.w||4.5)+'%';d.style.height=(h.h||5)+'%';
+  if(h.nav){d.dataset.a=h.a||'➜';}
+  d.title=h.t?T(h.t):'';
+  d.onclick=e=>{e.stopPropagation();clickH(h,k,i);};
+  $('#hotspots').appendChild(d);
+}
+function denyUse(){say(T({en:'That doesn’t fit here.',jp:'それはここでは使えない。'}));sfxDeny();}
+function clickH(h,k,i){
+  ac();
+  if(h.item){
+    if(sel===h.item){actH(h,k);sel=null;renderInv();return;}
+    if(h.auto&&has(h.item)){actH(h,k);return;}
+    if(sel!==null){denyUse();sel=null;renderInv();return;}
+    say(T({en:'Something here needs a tool or a key…',jp:'ここには何かの道具・鍵が必要そうだ…'}));sfxClick();return;
+  }
+  if(sel!==null){denyUse();sel=null;renderInv();return;}
+  if(h.cond&&!h.cond())return;
+  if(h.done&&fl(h.done)&&!h.rep){if(h.dt)say(T(h.dt));return;}
+  return actH(h,k);
+}
+function actH(h,k){
+  mark(k);
+  if(h.act){const r=h.act(k);if(r===false){sfxDeny();return false;}if(r!==undefined)return true;}
+  else if(h.say)say(T(h.say));
+  else if(h.nav)nav(h.nav);
+  else say(T(h.desc||UI.nothing));
+  if(h.done)sf(h.done,true);
+  renderHots(ROOMS[G.room]);
+  return true;
+}
+function renderInv(){
+  const box=$('#inv');box.innerHTML='';
+  G.inv.forEach(id=>{
+    const it=ITEMS[id];const d=document.createElement('div');
+    d.className='item'+(sel===id?' sel':'');
+    d.innerHTML='<span>'+it.g+'</span>';
+    d.title=nameOf(id)+'\n'+T(it.d);
+    d.onclick=()=>{ac();sfxClick();
+      if(sel===id){sel=null;}
+      else{sel=id;say('<i>'+nameOf(id)+'</i><br><span style="opacity:.8">'+T(it.d)+'</span>',6500);}
+      renderInv();};
+    box.appendChild(d);
+  });
+}
+/* ---------------- menus / overlays ---------------- */
+const ZONES=[
+ {en:'RESORT · 1F',jp:'リゾート · 1F',ids:['lobby','reception','office','bar','store','corr1','gen']},
+ {en:'RESORT · 2F',jp:'リゾート · 2F',ids:['stairs','corr2','r201','r205']},
+ {en:'KITCHEN & GARDEN',jp:'キッチンと庭',ids:['kitchen','rest','garden','poolbar']},
+ {en:'WATERFRONT',jp:'水辺',ids:['pool','changeroom','beach','cave','boath','pier']},
+ {en:'LIGHTHOUSE',jp:'灯台',ids:['lhout','lhin']}
+];
+function openMap(){
+  let html='<h3>'+T(UI.mapT)+'</h3>';
+  ZONES.forEach(z=>{
+    const vis=z.ids.filter(id=>fl('v_'+id));
+    if(!vis.length)return;
+    html+='<div class="mzTitle">'+T(z)+' · '+vis.length+'/'+z.ids.length+'</div><div class="grid">'+
+      vis.map(id=>'<div class="jcell on" style="cursor:pointer" onclick="nav(\''+id+'\')">'+T(ROOMS[id].n)+'</div>').join('')+'</div>';
+  });
+  const total=Object.keys(ROOMS).length, found=ZONES.reduce((a,z)=>a+z.ids.filter(id=>fl('v_'+id)).length,0);
+  html+='<p class="small" style="margin-top:2vmin">'+found+' / '+total+'</p>';
+  openOv(html);
+}
+function openJournal(){
+  const tot=countMarked();
+  let html='<h3>'+T(UI.jT)+' — '+G.seen.length+' / '+tot+' '+T(UI.found)+'</h3><div class="grid">';
+  for(const id in ROOMS){
+    (ROOMS[id].h||[]).forEach((h,i)=>{
+      if(!h.mark)return;
+      const k=id+':'+i;
+      html+='<div class="jcell '+(isSeen(k)?'on':'off')+'">'+(isSeen(k)?'✓ ':'? ')+(h.t?T(h.t):'?')+'</div>';
+    });
+  }
+  html+='</div>';
+  openOv(html);
+}
+let _markCache=null;
+function countMarked(){if(_markCache===null){_markCache=0;for(const id in ROOMS)(ROOMS[id].h||[]).forEach(h=>{if(h.mark)_markCache++;});}return _markCache;}
+function openHint(){
+  const h=HINTS.find(h=>h.c());
+  openOv('<h3>'+T(UI.hint)+'</h3><p>'+T(h?h.t:{en:'',jp:''}).replace(/\n/g,'<br>')+'</p>'+
+   '<p class="small">'+T({en:'Every locked number in this resort is written down somewhere. Keep looking.',jp:'このリゾートの解錠番号は、すべてどこかに必ず書かれている。探せ。'})+'</p>');
+}
+function openHelp(){
+  openOv('<h3>'+T(UI.helpT)+'</h3><p>'+T(UI.help).replace(/\n/g,'<br>')+'</p>'+
+   '<p class="small">'+T({en:'Saved automatically: localStorage key '+SAVEKEY,jp:'自動保存先: localStorage key '+SAVEKEY})+'</p>');
+}
+/* ---------------- title / intro / ending ---------------- */
+function showTitle(){
+  const s=$('#scrTitle');s.style.display='flex';
+  const sv=getSave();
+  s.innerHTML='<svg id="titleArt" viewBox="0 0 400 170">'+
+   '<defs><linearGradient id="tsg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1327"/><stop offset="1" stop-color="#050a14"/></linearGradient></defs>'+
+   '<rect width="400" height="170" fill="url(#tsg)"/>'+
+   Array.from({length:46},(_,i)=>'<circle cx="'+(i*97%400)+'" cy="'+(i*53%110)+'" r="'+(0.7+(i%3)*0.5)+'" fill="#cfe0ff" opacity="'+(0.25+(i%5)*0.13)+'"/>').join('')+
+   '<circle cx="322" cy="42" r="20" fill="#f2e6bd"/><circle cx="314" cy="38" r="20" fill="#0b1327"/>'+
+   '<path d="M0 120 Q60 112 120 120 T260 118 T400 122 V170 H0 Z" fill="#0a1424"/>'+
+   '<path d="M96 120 L104 120 L112 52 L88 52 L96 120 Z" fill="#060b16"/>'+
+   '<rect x="86" y="44" width="28" height="10" fill="#060b16"/>'+
+   '<polygon points="112,49 260,20 260,80" fill="#e8c877" opacity="0.16"/>'+
+   '<circle cx="100" cy="49" r="4" fill="#ffe9a9"/>'+
+   '<path d="M330 128 l14 0 3 6 -20 0 z" fill="#0a1020"/>'+
+   '</svg>'+
+   '<h1>'+T(UI.gameTitle)+'</h1>'+
+   '<p>'+T(UI.tagline)+'</p>'+
+   '<p class="small">'+(sv?('★ '+(LANG()==='jp'?'セーブデータあり':'SAVE DATA FOUND')+' · '+sv.seen.length+' '+T(UI.found)):'')+'</p>'+
+   '<div>'+(sv?'<button class="btn" id="tC">'+T(UI.cont)+'</button>':'')+'<button class="btn'+(sv?' ghost':'')+'" id="tN">'+T(UI.nw)+'</button></div>'+
+   '<p class="small">🔊 / EN・日本語 · autosave 💾</p>';
+  if(sv)$('#tC').onclick=()=>{G=sv;startGame();};
+  $('#tN').onclick=()=>{if(getSave()&&!confirm(T(UI.newQ)))return;wipeSave();G=fresh();startGame(true);};
+  hideEnd();
+}
+function startGame(freshStart){
+  $('#scrTitle').style.display='none';
+  updateLanguageUI();
+  if(G.sound)ac();else $('#bSound').classList.remove('on');
+  if(!fl('v_'+G.room))sf('v_'+G.room,true);
+  render();
+  if(freshStart||!isSeen('intro')){
+    openOv('<h3>'+T(UI.introT)+'</h3><p>'+T(UI.intro).replace(/\n/g,'<br>')+'</p><div style="text-align:center"><button class="btn" id="goBtn">'+T(UI.begin)+'</button></div>');
+    mark('intro');
+    $('#goBtn').onclick=()=>{closeOv();sfxThunder();say(T({en:'…Where is this? Move — tap the glowing spots.',jp:'…ここはどこだ。動け——光る場所をタップしろ。'}));};
+  }
+}
+function endGame(kind){
+  const mins=Math.max(1,Math.round((Date.now()-G.t0)/60000));
+  G.endings.push(kind);autosave();
+  const trueEnd=(kind==='true');
+  const s=$('#scrEnd');s.style.display='flex';
+  s.innerHTML='<svg id="endArt" viewBox="0 0 400 170">'+
+   '<defs><linearGradient id="esg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+(trueEnd?'#28304f':'#0b1327')+'"/><stop offset="1" stop-color="#04070d"/></linearGradient></defs>'+
+   '<rect width="400" height="170" fill="url(#esg)"/>'+
+   (trueEnd?'<circle cx="330" cy="36" r="16" fill="#f6ecd0"/><path d="M0 36 h60" stroke="#ffe9a9" stroke-width="3" opacity=".5"/>':'<circle cx="60" cy="140" r="18" fill="#c97b3c"/><path d="M0 150 H400" stroke="#c97b3c" stroke-width="2" opacity=".5"/>')+
+   '<path d="M0 120 Q80 114 160 120 T400 118 V170 H0 Z" fill="#0a1424"/>'+
+   '<path d="M150 128 l44 0 6 8 -56 0 z" fill="#0d1526"/><path d="M170 118 l4 10 h-8 z" fill="#243049"/>'+
+   (trueEnd?'<path d="M360 118 l4 0 4 -46 -12 0 4 46 z" fill="#060b16"/><polygon points="352,68 210 40 210,96" fill="#e8c877" opacity=".2"/>':'')+
+   '</svg>'+
+   '<h2>'+T(trueEnd
+     ?{en:'★ ESCAPE — THE LIGHT ANSWERED ★',jp:'★ 脱出成功 — 灯台が答えた ★'}
+     :{en:'ESCAPE — BUT THE SEA KEPT ITS SECRET',jp:'脱出 — だが海は秘密を明かさなかった'})+'</h2>'+
+   '<p>'+T(trueEnd
+     ?{en:'The beam swept the black water and the channel markers flared one after another — each a green promise. Your engine coughed, caught, and the resort fell behind you, silent as a held breath.\n\nSomewhere out there a ferry horn answered the light. You will never tell anyone what the resort whispered. Nobody would believe you anyway.',
+        jp:'光は黒い水面を薙ぎ、航路のブイが次々に灯った——ひとつひとつが緑の約束だ。船外機は咳込んで、噛んで、リゾートは背後に沈んでいった。息を詰めたままの静寂ごと。\n\nどこかでフェリーの汽笛が灯りに応えた。リゾートが囁いたことを、誰にも話すまい。誰も信じないが。'}
+     :{en:'You slipped out of the bay in darkness, feeling the channel with your eyes alone. Something crossed under the hull twice. Twice you did not look down.\n\nDawn found you drifting off the ferry route, alive, with a boat that would not start again. Rescue came eventually. It asked no questions.',
+        jp:'暗闇のまま湾を出た。手探りで航路を進み、船底の下で何か二度横切った。二度と下は見なかった。\n\n夜明け、フェリー航路の外で漂流しているところを発見された。船外機は再びかからなかった。救助は質問しなかった。'})
+    .replace(/\n/g,'<br>')+'</p>'+
+   '<p class="small">'+T(UI.timeStat)+': '+mins+' min · '+T(UI.discStat)+': '+G.seen.length+' / '+countMarked()+' · '+T(UI.rank)+': '+(trueEnd?'★★★':'★★')+'</p>'+
+   '<p class="small">'+T(UI.endBack)+'</p>'+
+   '<div><button class="btn ghost" id="eStay">'+T(UI.endStay)+'</button><button class="btn" id="eNew">'+T(UI.endNew)+'</button></div>';
+  $('#eStay').onclick=hideEnd;
+  $('#eNew').onclick=()=>{wipeSave();G=fresh();hideEnd();showTitle();};
+}
+function hideEnd(){$('#scrEnd').style.display='none';}
+/* ---------------- boot ---------------- */
+let hlOn=false;
+function updateLanguageUI(){
+  $('#bLang').textContent=T(UI.lang);
+  $('#bSound').textContent=T(UI.snd)+(G.sound?' ON':' OFF');
+  $('#bSound').classList.toggle('on',G.sound);
+  $('#bMap').textContent=T(UI.map);$('#bJournal').textContent=T(UI.journal);
+  $('#bHint').textContent=T(UI.hint);$('#bSave').textContent=T(UI.save);$('#bTitle').textContent=T(UI.quit);
+  $('#rotTxt').textContent=T(UI.rot);
+  document.documentElement.lang=LANG()==='jp'?'ja':'en';
+}
+function toggleLang(){G.lang=G.lang==='jp'?'en':'jp';updateLanguageUI();
+  render();autosave();say(T({en:'Language switched to English. The resort understands both.',jp:'言語を日本語に切り替えました。リゾートは両方の言葉を知っています。'}));}
+function wireMenu(){
+  $('#bLang').onclick=()=>{ac();sfxClick();toggleLang();};
+  $('#bSound').onclick=()=>{ac();setSound(!G.sound);if(G.sound)sfxClick();};
+  $('#bMap').onclick=()=>{ac();sfxClick();openMap();};
+  $('#bJournal').onclick=()=>{ac();sfxClick();openJournal();};
+  $('#bHint').onclick=()=>{ac();sfxClick();openHint();};
+  $('#bHelp').onclick=()=>{ac();sfxClick();openHelp();};
+  $('#bSave').onclick=()=>{ac();sfxSolved();autosave();say(T(UI.saved));};
+  $('#bTitle').onclick=()=>{ac();autosave();showTitle();};
+  $('#scene').addEventListener('click',()=>{sel=null;renderInv();});
+  $('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeOv();});
+  window.addEventListener('resize',()=>$('#rotate').classList.toggle('show',innerHeight>innerWidth&&matchMedia('(pointer:coarse)').matches));
+  document.addEventListener('pointerdown',()=>ac(),{once:true});
+}
+/* ================= GAME DATA: rooms ================= */
+const ROOMS={};
+function defRoom(id,o){ROOMS[id]=o;}
+/* ---------- shared art helpers ---------- */
+function defs(){return '<defs>'+
+ '<linearGradient id="gsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1327"/><stop offset=".65" stop-color="#14233c"/><stop offset="1" stop-color="#1d3350"/></linearGradient>'+
+ '<linearGradient id="gfl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#27314a"/><stop offset="1" stop-color="#0d121d"/></linearGradient>'+
+ '<linearGradient id="gsea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16324d"/><stop offset="1" stop-color="#081019"/></linearGradient>'+
+ '<linearGradient id="gpit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#155a70"/><stop offset="1" stop-color="#07222f"/></linearGradient>'+
+ '<radialGradient id="gmo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fdf6d8"/><stop offset=".75" stop-color="#eee4b8"/><stop offset="1" stop-color="#eee4b8" stop-opacity="0"/></radialGradient>'+
+ '<radialGradient id="gsw" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="#28374e"/><stop offset="1" stop-color="#0b101a"/></radialGradient>'+
+ '<radialGradient id="ggl" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe9a9" stop-opacity=".7"/><stop offset="1" stop-color="#ffe9a9" stop-opacity="0"/></radialGradient>'+
+ '<radialGradient id="ggl2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#8fe3ff" stop-opacity=".8"/><stop offset="1" stop-color="#8fe3ff" stop-opacity="0"/></radialGradient>'+
+ '</defs>';}
+function sky(){return '<rect width="1600" height="900" fill="url(#gsky)"/>'+
+ Array.from({length:50},(_,i)=>'<circle class="tw" cx="'+(40+(i*211)%1540)+'" cy="'+(14+(i*89)%300)+'" r="'+(1+(i%3)*.7)+'" fill="#dceaff" opacity="'+(.25+(i%4)*.18)+'"/>').join('')+
+ '<circle cx="1330" cy="104" r="120" fill="url(#gmo)" opacity=".55"/><circle cx="1330" cy="104" r="46" fill="#f4ecd2"/><circle cx="1310" cy="94" r="9" fill="#e2d7b4" opacity=".6"/><circle cx="1348" cy="118" r="6" fill="#e2d7b4" opacity=".5"/>';}
+function seaG(y){return '<rect x="0" y="'+y+'" width="1600" height="'+(900-y)+'" fill="url(#gsea)"/>';}
+function moonR(y){return '<circle cx="1180" cy="'+(y+26)+'" r="24" fill="url(#gmo)" opacity=".8"/><path class="waterSh" d="M1150 '+(y+70)+' q30 6 60 0 M1120 '+(y+120)+' q40 8 80 0" stroke="#7fa8cf" stroke-width="2" fill="none" opacity=".35"/>';}
+function wave(y){return '<path class="waterSh" d="M0 '+y+' q60 -10 120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0" stroke="#7fa8cf" stroke-width="3" fill="none" opacity=".35"/>';}
+function win(x,y,w,h){return '<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="#0d1a30" stroke="#2c3a52" stroke-width="6"/>'+
+ '<path d="M'+(x+w*.28)+' '+y+' l'+(w*.1)+' '+(h*.5)+' l-'+(w*.16)+' '+(h*.5)+'" stroke="#41546f" stroke-width="3" fill="none" opacity=".7"/>'+
+ '<path d="M'+x+' '+(y+h*.4)+' h'+w+' M'+(x+w/2)+' '+y+' v'+h+'" stroke="#22304a" stroke-width="5" fill="none"/>'+
+ '<polygon points="'+x+','+(y+h)+' '+(x+w*.5)+','+(y+h*.15)+' '+(x+w)+','+(y+h)+'" fill="#a8c8ec" opacity=".08"/></g>';}
+function door(x,y,w,h,open){return '<g><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+(open?'#05080e':'#18223a')+'" stroke="#33415e" stroke-width="6"/>'+
+ (open?'':'<path d="M'+(x+8)+' '+(y+h*.3)+' h'+(w-16)+' M'+(x+8)+' '+(y+h*.62)+' h'+(w-16)+'" stroke="#22304a" stroke-width="4"/>')+'</g>';}
+function wall(wc){return '<path d="M0 0 H1600 V660 Q1200 630 800 664 Q400 696 0 656 Z" fill="'+(wc||'#141c2b')+'"/>'+
+ '<path d="M0 0 H1600 V66 Q1100 102 700 60 Q340 26 0 82 Z" fill="#090e18"/>'+
+ '<g stroke="#1c2740" stroke-width="2" opacity=".4"><path d="M120 0 V660 M320 0 V654 M520 0 V648 M760 0 V656 M1000 0 V660 M1240 0 V652 M1460 0 V660"/></g>';}
+function floorP(){return '<rect y="648" width="1600" height="252" fill="url(#gfl)"/>'+
+ '<g stroke="#0b101a" stroke-width="2" opacity=".5"><path d="M0 712 H1600 M0 800 H1600 M220 648 V900 M540 648 V900 M860 648 V900 M1180 648 V900 M1460 648 V900"/></g>';}
+function rug(){return '<ellipse cx="800" cy="790" rx="330" ry="86" fill="#1d3a34" stroke="#2c554a" stroke-width="4" opacity=".85"/>';}
+function cob(x,y,s){return '<path d="M'+x+' '+y+' q'+(40*s)+' '+(14*s)+' '+(56*s)+' '+(52*s)+' M'+x+' '+y+' q'+(16*s)+' '+(40*s)+' '+(30*s)+' '+(62*s)+'" stroke="#39455a" stroke-width="1.6" fill="none" opacity=".8"/>';}
+function beamFx(){return '<g class="beamsw"><polygon points="40,-14 -560,-130 -560,102 40,14" fill="#ffe9a9" opacity="0.12"/><polygon points="40,-14 -560,-130 -560,102 40,14" fill="none" stroke="#ffe9a9" stroke-width="1" opacity=".3"/></g>';}
+function shipFx(){return '<g><path d="M1420 236 h46 l7 9 h-60 z" fill="#0c1424"/><path d="M1440 236 v-22 l20 22z" fill="#1a2740"/><circle cx="1463" cy="216" r="3" fill="#ffdf8a"/><path d="M1413 248 q40 4 76 0" stroke="#7fa8cf" stroke-width="2" fill="none" opacity=".5"/></g>';}
+/* ================= 1F INDOOR ================= */
+defRoom('lobby',{n:{en:'GRAND LOBBY',jp:'グランドロビー'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall()}${floorP()}${rug()}
+${fl('boards')?'<rect x="306" y="466" width="458" height="190" fill="#3d2d1c" stroke="#5a442c" stroke-width="5"/><path d="M312 496 L758 596 M312 566 L758 494 M312 630 L758 540" stroke="#6b5136" stroke-width="9"/>':''}
+${door(318,452,430,340)}
+<g stroke="#1a2438" stroke-width="4" fill="none"><path d="M800 60 Q830 210 800 360 M540 300 q260 -60 520 0 M540 300 v360 M1060 300 v360"/></g>
+<ellipse cx="800" cy="300" rx="262" ry="92" fill="#0c1526" stroke="#26314a" stroke-width="6"/>
+<path d="M640 296 l40 -52 M760 286 l-14 -60 M900 300 l52 -40 M640 296 l-20 44" stroke="#3d5570" stroke-width="0" fill="none"/>
+<polygon points="1060,420 1330,130 1420,470 1160,900 850,900" fill="#9fc0e8" opacity="0.055"/>
+<g><line x1="800" y1="0" x2="800" y2="112" stroke="#2c3648" stroke-width="4"/><ellipse cx="800" cy="142" rx="84" ry="18" fill="#3a3122" stroke="#5b4c30" stroke-width="3"/><g fill="#caa85f" opacity=".85"><circle cx="756" cy="166" r="5"/><circle cx="800" cy="178" r="5"/><circle cx="844" cy="166" r="5"/><path d="M770 148 q-6 20 -12 26 M830 148 q6 22 12 26" stroke="#caa85f" stroke-width="2" fill="none"/></g>${fl('chandelier')?'<circle cx="800" cy="146" r="72" fill="url(#ggl)"/>':''}</g>
+<g><path d="M242 560 Q236 470 252 428 M262 560 Q272 480 296 440" stroke="#23402f" stroke-width="7" fill="none"/><g fill="#2c5540" opacity=".92"><path d="M252 426 q-40 -26 -68 -8 q28 28 68 8z"/><path d="M296 438 q42 -22 64 4 q-34 24 -64 -4z"/><path d="M250 468 q-34 6 -46 34 q32 6 46 -34z"/></g><rect x="220" y="556" width="60" height="88" rx="8" fill="#4a3626" stroke="#5f462f" stroke-width="3"/></g>
+<g><rect x="1308" y="296" width="176" height="124" rx="6" fill="#241a10" stroke="#4a3620" stroke-width="5"/><g fill="#cfc3a2" opacity=".85"><rect x="1322" y="310" width="46" height="58" transform="rotate(-4 1345 339)"/><rect x="1380" y="314" width="52" height="48" transform="rotate(3 1406 338)"/><rect x="1330" y="376" width="60" height="32"/></g><circle cx="1345" cy="306" r="4" fill="#c0392b"/><circle cx="1406" cy="308" r="4" fill="#2e6da4"/><text x="1392" y="352" font-size="22" fill="#8f8465" font-family="serif">1998</text></g>
+<g><rect x="36" y="636" width="256" height="96" rx="18" fill="#1e2a3d" stroke="#31405a" stroke-width="3"/><rect x="50" y="580" width="228" height="64" rx="14" fill="#243349" stroke="#31405a" stroke-width="3"/><rect x="58" y="732" width="26" height="44" fill="#141c2b"/><rect x="244" y="732" width="26" height="44" fill="#141c2b"/></g>
+<g opacity=".9"><rect x="1216" y="230" width="12" height="420" fill="#1a2334"/><rect x="1150" y="452" width="146" height="120" fill="#1c2638" stroke="#2c3a52" stroke-width="3"/><path d="M1204 448 q14 -16 30 0 z" fill="#c9a95f"/></g>
+${cob(0,66,1)}${cob(1600,70,-1)}
+<ellipse cx="520" cy="836" rx="60" ry="16" fill="#38404f" opacity=".55"/><ellipse cx="940" cy="862" rx="44" ry="12" fill="#38404f" opacity=".45"/>
+</svg>`,
+nav:[{to:'reception',x:91,y:47,a:'➜'},{to:'bar',x:91,y:70,a:'➜'},{to:'corr1',x:73,y:50,a:'➜'},{to:'beach',x:42,y:56,a:'◀',cond:()=>fl('boards')}],
+h:[
+ {x:12,y:71,w:17,h:12,t:{en:'Sofa',jp:'ソファ'},mark:1,act:()=>{
+   if(no('flashlight')){give('flashlight');looted('flashlight');say(T({en:'A heavy flashlight rolls out from under the cushion. No power — the batteries are corroded.',jp:'クッションの下から重い懐中電灯。電源が入らない——電池が腐食している。'}));}
+   else say(T({en:'Leather split like old skin. Something scuttles away in the dark.',jp:'革は古い皮膚のように裂けている。闇の中で何かが走り去る。'}));}},
+ {x:15.5,y:73,w:9,h:5,rep:1,t:{en:'Under the sofa',jp:'ソファの下'},mark:1,act:()=>say(T({en:'Dust, a straw hat, and the smell of a summer that never ended.',jp:'埃、麦わら帽子、そして終わらなかった夏の匂い。'}))},
+ {x:50,y:16.5,w:11,h:8,t:{en:'Chandelier',jp:'シャンデリア'},mark:1,act:()=>{
+   if(fl('chandelier')){say(T({en:'Its crystals tick softly, remembering the wind.',jp:'クリスタルが風の記憶を小さく鳴らしている。'}));return;}
+   sf('chandelier');sfxDoor();give('cashkey');
+   say(T({en:'You tug the pull-chain. Something brass falls into the rug — a key stamped CASH.',jp:'鎖を引く。絨毯に真鍮の音が落ちる——「CASH」の刻印の鍵だ。'}));}},
+ {x:85,y:39,w:11.5,h:14.5,rep:1,t:{en:'Notice board',jp:'掲示板'},mark:1,act:()=>say(T({en:'Faded poster: “AZURE BAY RESORT — GRAND CLOSING SEASON 1998”. A life-ring doodle has the numbers 4 - 2 - 7 drawn through it. Someone scrawled beneath: “the moon keeps the code.”',jp:'色あせたポスター：「AZURE BAY RESORT — グランド・クロージング・シーズン 1998」。ライフリングの落書きに 4-2-7 の数字。下に誰かの走り書き：「暗証番号は月が覚えている」。'}))},
+ {x:42,y:58,w:27,h:21,rep:1,t:{en:'Beach doors',jp:'ビーチ側のドア'},mark:1,cond:()=>!fl('boards'),item:'crowbar',auto:1,act:()=>{
+   say(T({en:'The boards come off with a scream of nails. Salt air floods the lobby — the beach is out there.',jp:'金具が悲鳴を上げて板が剥がれる。潮の匂いがロビーに押し寄せる——外はビーチだ。'}));sf('boards');sfxCreak();sf('v_beach');
+   $('#scene').innerHTML=art('lobby');renderHots(ROOMS['lobby']);}},
+ {x:42,y:58,w:27,h:21,rep:1,t:{en:'To the BEACH',jp:'ビーチへ'},cond:()=>fl('boards'),nav:'beach'},
+ {x:15,y:32,w:12,h:16,rep:1,t:{en:'Broken window',jp:'割れた窓'},mark:1,act:()=>say(T({en:'The glass is long gone. Night, palms, and the hoot of a distant owl.',jp:'ガラスはとっくにない。夜とヤシ、ふくろうの遠吠え。'}))},
+ {x:91.5,y:55,w:6,h:14,t:{en:'Reception desk',jp:'受付'},mark:1,act:()=>say(T({en:'A brass bell, polished recently. Someone checks in here still.',jp:'真鍮の bell。最近磨かれたばかりだ。誰かはまだチェックインしている。'}))}
+]});
+defRoom('reception',{n:{en:'RECEPTION',jp:'フロント'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#151d2e')}${floorP()}
+<g><rect x="120" y="520" width="960" height="70" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="150" y="590" width="900" height="220" fill="#1d150c" stroke="#33251a" stroke-width="4"/><g stroke="#3a2b1c" stroke-width="3"><path d="M350 590 V810 M600 590 V810 M850 590 V810"/></g><rect x="118" y="506" width="964" height="16" fill="#2f2313"/></g>
+<g><rect x="640" y="428" width="180" height="82" rx="8" fill="#241a10" stroke="#4a3620" stroke-width="4"/><path d="M655 428 q35 -46 70 0 M725 428 q35 -46 70 0" stroke="#8d97a8" stroke-width="4" fill="none"/><rect x="650" y="452" width="70" height="36" fill="#cfc3a2" opacity=".5"/><circle cx="760" cy="470" r="6" fill="#c9a95f"/></g>
+<g><rect x="300" y="640" width="180" height="70" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="${''}0" y="0" width="0" height="0"/><path d="M385 672 h24" stroke="#c9a95f" stroke-width="5"/></g>
+${door(1180,400,190,410)}
+<g><rect x="1414" y="150" width="150" height="240" fill="#1c150c" stroke="#33251a" stroke-width="4"/><g stroke="#33251a" stroke-width="3"><path d="M1414 230 h150 M1414 310 h150"/></g><g fill="none" stroke="#c9a95f" stroke-width="3"><circle cx="1450" cy="196" r="8"/><circle cx="1490" cy="196" r="8"/><path d="M1450 204 v22 M1490 204 v22 M1444 226 h12 M1484 226 h12"/></g><text x="1424" y="292" font-size="22" fill="#6f6446" font-family="monospace">201  205</text></g>
+<g fill="#c9a95f"><path d="M180 512 l14 -16 14 16z"/></g>
+${cob(1600,64,-1.2)}${cob(0,72,1.2)}
+<text x="108" y="486" font-size="26" fill="#5d5335" font-family="serif" letter-spacing="4">CHECK IN · CHECK OUT</text>
+</svg>`,
+nav:[{to:'lobby',x:5,y:60,a:'◀'}],
+h:[
+ {x:50,y:50,w:11.5,h:9,rep:1,t:{en:'Old register',jp:'古い出納帳'},mark:1,act:()=>say(T({en:'The ledger stops in November 1998. After that page, every line reads the same word: “STILL HERE”.',jp:'台帳は1998年11日で途切れている。それ以降の行はすべて同じ単語だ：「STILL HERE（まだここにいる）」。'}))},
+ {x:24,y:73,w:11.5,h:8.5,t:{en:'Desk drawer',jp:'机の引き出し'},mark:1,cond:()=>!fl('cashopen'),item:'cashkey',act:()=>{
+   sf('cashopen');sfxDoor();give('patch');give('officekey');
+   say(T({en:'The drawer glides open: a rubber hull patch with a smiley scratched into it, and a heavy iron key.',jp:'引き出しが開く：スマイルの傷が入ったゴム製の船体補修板と、鉄の重たい鍵。'}));}},
+ {x:24,y:73,w:11.5,h:8.5,rep:1,t:{en:'Desk drawer',jp:'机の引き出し'},cond:()=>fl('cashopen'),mark:1,act:()=>say(T({en:'Empty now, save for a film of 1998 dust.',jp:'もう空。1998年の埃の膜だけが残る。'}))},
+ {x:91.5,y:31,w:10,h:15,rep:1,t:{en:'Key shelf',jp:'鍵棚'},mark:1,act:()=>say(T({en:'Guest keys still hang in their slots. 201… 205… and one labelled “STAFF — DON’T”. You pocket nothing; these are not yours.',jp:'客室キーがまだ掛かっている。201…205…そして「STAFF — DON\'T（職員・見るな）」の札。持ち出すものはなし。'}))},
+ {x:78.5,y:62,w:12,h:24,rep:1,t:{en:'Back office door',jp:'裏事務室のドア'},mark:1,cond:()=>!fl('office'),item:'officekey',act:()=>{sf('office');sfxDoor();nav('office');}},
+ {x:78.5,y:62,w:12,h:24,t:{en:'Back office',jp:'裏事務室'},cond:()=>fl('office'),nav:'office'},
+ {x:96,y:63,w:8,h:16,t:{en:'Window',jp:'窓'},mark:1,act:()=>say(T({en:'The parking lot, and the tree line beyond. No lights anywhere.',jp:'駐車場とその樹木線。どこにも灯りはない。'}))}
+]});
+defRoom('office',{n:{en:'BACK OFFICE',jp:'裏事務室'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#161c28')}${floorP()}
+<g><circle cx="470" cy="430" r="130" fill="url(#ggl)" opacity="0.28"/><rect x="118" y="492" width="760" height="64" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="150" y="556" width="700" height="240" fill="#1d150c" stroke="#33251a" stroke-width="4"/><rect x="118" y="478" width="760" height="16" fill="#2f2313"/>
+<g><rect x="360" y="372" width="270" height="112" rx="8" fill="#16202f" stroke="#33415e" stroke-width="5"/><rect x="376" y="386" width="120" height="84" rx="4" fill="#1d2a3d" stroke="#42536f" stroke-width="3"/><circle cx="540" cy="428" r="26" fill="#0f1826" stroke="#42536f" stroke-width="4"/><path d="M540 402 v26" stroke="#8d97a8" stroke-width="4"/></g></g>
+<g><rect x="920" y="486" width="320" height="360" fill="#181208" stroke="#33251a" stroke-width="4"/><g stroke="#33251a" stroke-width="3"><path d="M920 580 h320 M920 680 h320 M920 780 h320"/></g><g fill="#2e2412"><rect x="950" y="520" width="90" height="48"/><rect x="1060" y="516" width="70" height="52"/><rect x="960" y="620" width="70" height="48"/><rect x="1120" y="724" width="90" height="46"/></g><text x="946" y="551" font-size="16" fill="#6f6446">LOGS</text></g>
+${door(1360,420,180,390)}
+<g><rect x="108" y="330" width="180" height="120" fill="none" stroke="#33415e" stroke-width="4"/><text x="130" y="392" font-size="26" fill="#7d8898" font-family="monospace">AZURE BAY</text><path d="M120 420 q60 -18 150 0" stroke="#4a556e" stroke-width="0" fill="none"/></g>
+<g transform="translate(700 470)"><path d="M0 0 q-14 -60 6 -96" stroke="#4a3620" stroke-width="6" fill="none"/><rect x="-16" y="-140" width="34" height="46" rx="6" fill="#243349"/><circle cx="0" cy="-94" r="26" fill="url(#ggl)"/></g>
+${cob(1600,60,-1)}
+</svg>`,
+nav:[{to:'reception',x:89,y:63,a:'◀'}],
+h:[
+ {x:29,y:46.5,w:17.5,h:13,t:{en:'Wall safe',jp:'壁の金庫'},mark:1,cond:()=>!fl('safeopen'),act:()=>{
+   numLock(T({en:'The safe: three numbers',jp:'金庫：3桁の数字'}),'719',()=>{sf('safeopen');give('lhkey');give('ekey');
+     say(T({en:'Inside: a long iron key stamped LIGHTHOUSE, and a T-shaped engine handle.',jp:'中身：「LIGHTHOUSE」の長い鉄鍵と、T字型のエンジンハンドル。'}));});}},
+ {x:29,y:46.5,w:17.5,h:13,rep:1,t:{en:'Wall safe',jp:'壁の金庫'},cond:()=>fl('safeopen'),mark:1,act:()=>say(T({en:'The safe yawns empty. Its dial still smells of brass polish.',jp:'金庫はあくびをして空だ。ダイヤルはまだ真鍮磨きの匂いを残す。'}))},
+ {x:57,y:76,w:13,h:9,rep:1,t:{en:'Desk drawer',jp:'机の引き出し'},mark:1,act:()=>say(T({en:'Guest ledger, volume two. Page after page of the same guest: “GUEST #0 — ROOM: ALL — DEPARTURE: PENDING”.',jp:'客帳簿の第二巻。同じ客の名前が続く：「GUEST #0 — ROOM: ALL（全室）— DEPARTURE: PENDING（出発：未定）」。'}))},
+ {x:70.5,y:66,w:19,h:18,rep:1,t:{en:'Shelves',jp:'棚'},mark:1,act:()=>say(T({en:'Maintenance logs. One line underlined twice: “11·02·1998 — the sea pays for everything. Balance it in the light.”',jp:'整備日誌。二重下線：「1998-11-02 — 海はすべてを値踏みする。光で帳簿を合わせろ」。'}))},
+ {x:44,y:52,w:7,h:9,rep:1,t:{en:'Oil lamp',jp:'オイルランプ'},mark:1,act:()=>say(T({en:'Cold, filled, and wick trimmed fresh. You decide not to ask who trims it.',jp:'冷めているがオイルは満たされ、芯は新しく刈られている。誰が刈ったのか聞かないでおこう。'}))},
+ {x:89.5,y:62,w:9,h:18,t:{en:'To reception',jp:'フロントへ'},nav:'reception'}
+]});
+defRoom('bar',{n:{en:'Palm Bar',jp:'パームバー'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#16182a')}${floorP()}
+<g><rect x="820" y="500" width="720" height="66" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="850" y="566" width="660" height="250" fill="#1d150c" stroke="#33251a" stroke-width="4"/><rect x="818" y="486" width="726" height="16" fill="#2f2313"/>
+<g stroke="#33251a" stroke-width="3"><path d="M1000 566 V816 M1250 566 V816"/></g></g>
+<g><rect x="1240" y="200" width="120" height="34" fill="#1d150c"/><rect x="1225" y="234" width="150" height="18" fill="#2f2313"/><g fill="#2c5540"><rect x="1250" y="170" width="14" height="30"/><rect x="1272" y="162" width="12" height="38"/><rect x="1296" y="176" width="14" height="24"/><rect x="1322" y="166" width="12" height="34"/></g></g>
+<g><rect x="1420" y="230" width="140" height="240" fill="#1c150c" stroke="#33251a" stroke-width="4"/><g fill="#1a2334"><rect x="1436" y="252" width="40" height="14"/><rect x="1500" y="252" width="40" height="14"/><rect x="1436" y="330" width="40" height="14"/><rect x="1500" y="330" width="40" height="14"/></g></g>
+<g><rect x="180" y="300" width="190" height="330" rx="14" fill="#3a2118" stroke="#6b3a24" stroke-width="5"/><path d="M196 316 h158 v96 h-158z" fill="#12100c"/><g fill="#e8c877"><circle cx="230" cy="350" r="6"/><circle cx="262" cy="368" r="6"/><circle cx="300" cy="342" r="6"/></g><rect x="206" y="470" width="140" height="120" fill="#241a10" stroke="#4a3620" stroke-width="3"/><text x="224" y="540" font-size="30" fill="#e8c877" font-family="serif">AZURE</text><text x="240" y="572" font-size="22" fill="#8d6f3a" font-family="serif">MELODIES</text></g>
+<g><path d="M540 640 h420 l-40 -60 h-340 z" fill="#173a30" stroke="#2c554a" stroke-width="5"/><rect x="500" y="640" width="500" height="130" fill="#14231d" stroke="#2c554a" stroke-width="5"/><g fill="#101b16"><rect x="540" y="770" width="30" height="80"/><rect x="930" y="770" width="30" height="80"/></g><g fill="#d9d2c0"><circle cx="620" cy="612" r="9"/><circle cx="700" cy="602" r="9"/><circle cx="800" cy="616" r="9"/><circle cx="880" cy="606" r="9"/></g><g fill="#c9553f"><circle cx="660" cy="620" r="9"/></g></g>
+<line x1="1010" y1="596" x2="1180" y2="536" stroke="#c9a95f" stroke-width="5" stroke-linecap="round"/>
+${door(1360,420,180,390)}
+${win(470,140,220,280)}
+<g fill="#cfc3a2" opacity=".6"><rect x="900" y="516" width="30" height="20" rx="4"/><rect x="1000" y="514" width="26" height="22" rx="4"/></g>
+${fl('boards')?'':'<path d="M1240 810 l40 0" stroke="#2c554a" stroke-width="0"/>'}
+${cob(0,64,1.1)}${cob(1600,66,-1.1)}
+</svg>`,
+nav:[{to:'lobby',x:5,y:60,a:'◀'}],
+h:[
+ {x:17,y:54,w:13,h:26,t:{en:'Jukebox',jp:'ジュークボックス'},mark:1,cond:()=>!fl('poollock'),act:()=>{
+   poolLock(()=>{sf('poollock');sfxDoor();say(T({en:'“Azure Moon” fills the bar — and with a thunk, a panel under the pool table swings open. Beyond it: a door you never saw.',jp:'「Azure Moon」がバーに満ちる——ガシャン、とビリヤード台下のパネルが開き、その先に見たことのない扉。'}));});}},
+ {x:17,y:54,w:13,h:26,rep:1,t:{en:'Jukebox',jp:'ジュークボックス'},cond:()=>fl('poollock'),mark:1,act:()=>say(T({en:'It plays only one song. You let it.',jp:'一曲しか流れない。そのまま流させておこう。'}))},
+ {x:84,y:34,w:8,h:10,rep:1,t:{en:'Bottles',jp:'ボトル'},mark:1,act:()=>say(T({en:'Everything is sealed. The dust on the labels is older than you are.',jp:'すべて未開封。ラベルの埃はお前より古い。'}))},
+ {x:62,y:56,w:6,h:5,rep:1,t:{en:'A glass',jp:'グラス'},mark:1,act:()=>say(T({en:'You lift a glass. It is warm. You put it straight back.',jp:'グラスを取ると、温かい。すぐ戻す。'}))},
+ {x:53,y:71,w:9,h:5,rep:1,t:{en:'Pool cue',jp:'キュー'},mark:1,act:()=>say(T({en:'Slightly bent, like everything else here.',jp:'ここにある他のものと同様、少し曲がっている。'}))},
+ {x:41,y:67.5,w:8,h:5,t:{en:'Matchbox on the rail',jp:'テーブルのマッチ箱'},mark:1,act:()=>{
+   if(no('matchbox')){give('matchbox');looted('matchbox');say(T({en:'A brass matchbox, four matches. “AZURE BAY — LIGHT THE WAY”, it says.',jp:'真鍮のマッチ箱、マッチは4本。「AZURE BAY — 道に灯をともせ」と刻まれている。'}));}
+   else say(T({en:'Empty now.',jp:'もう空だ。'}));}},
+ {x:87.5,y:62,w:11,h:24,t:{en:'Storage door',jp:'物置の扉'},nav:'store'},
+ {x:35,y:29,w:13.5,h:16,rep:1,t:{en:'Window',jp:'窓'},mark:1,act:()=>say(T({en:'Palm silhouettes. A gecko watches you with one polite eye.',jp:'ヤシの影。ヤモリが一方向きにこちらを見ている。'}))}
+]});
+defRoom('store',{n:{en:'STORAGE',jp:'物置'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#141a24')}${floorP()}
+<g stroke="#2c3a52" stroke-width="4" fill="none"><rect x="60" y="120" width="360" height="620"/><path d="M60 300 h360 M60 490 h360 M60 660 h360"/></g>
+<g fill="#241a10" stroke="#33251a" stroke-width="3"><rect x="80" y="180" width="120" height="110"/><rect x="230" y="200" width="160" height="90"/><rect x="90" y="380" width="150" height="100"/><rect x="270" y="370" width="120" height="110"/><rect x="100" y="560" width="90" height="90"/><rect x="230" y="540" width="180" height="110"/></g>
+<g stroke="#4a3620" stroke-width="5"><rect x="1000" y="560" width="300" height="220" fill="#1c150c"/><path d="M1000 660 h300 M1150 560 V780"/></g>
+<g stroke="#4a3620" stroke-width="4"><rect x="1330" y="640" width="200" height="150" fill="#221a10"/><path d="M1330 715 h200"/></g>
+${fl('storewin')?'<rect x="640" y="150" width="240" height="320" fill="#05080e" stroke="#33415e" stroke-width="5"/><g stroke="#7fa8cf" stroke-width="3" fill="none" opacity=".5"><path d="M640 240 l40 60 M700 150 l-30 80 M880 150 l-60 120"/></g>':'<rect x="640" y="150" width="240" height="320" fill="#1c150c" stroke="#33251a" stroke-width="5"/><g stroke="#4a3620" stroke-width="7"><path d="M640 190 L880 430 M640 270 L880 150 M640 350 L880 230 M640 430 L820 150"/></g>'}
+${door(1420,430,150,380)}
+<text x="1040" y="640" font-size="24" fill="#5d5335" font-family="monospace" transform="rotate(-90 1050 700)">POOL DECK</text>
+${cob(0,60,1.3)}${cob(420,120,.9)}${cob(1600,58,-1.2)}
+<ellipse cx="760" cy="836" rx="50" ry="14" fill="#38404f" opacity=".5"/>
+</svg>`,
+nav:[{to:'bar',x:92,y:62,a:'◀'}],
+h:[
+ {x:47.5,y:34,w:15.5,h:18,t:{en:'Boarded-up window',jp:'板打ちの窓'},mark:1,cond:()=>!fl('storewin'),item:'crowbar',auto:1,act:()=>{
+   sf('storewin');sfxCreak();
+   say(T({en:'The boards pop free. Through the gap: a garden, and a side door to the pool bar.',jp:'板が弾ける。隙の向こう：庭と、プールバーへの裏口。'}));$('#scene').innerHTML=art('store');renderHots(ROOMS['store']);}},
+ {x:47.5,y:34,w:15.5,h:18,t:{en:'To the GARDEN',jp:'庭へ'},cond:()=>fl('storewin'),nav:'garden'},
+ {x:14,y:29,w:22,h:14,rep:1,t:{en:'Shelves',jp:'棚'},mark:1,act:()=>say(T({en:'Flares, road flares, and a birthday sparkler from 1986. Nothing that fits a lock.',jp:'フレア、道路用サイン花火、1986年のバースデー線香花火。錠に合うものはない。'}))},
+ {x:13,y:72,w:9,h:9,rep:1,t:{en:'Small crate',jp:'小箱'},mark:1,act:()=>say(T({en:'Mosquito coils. Enough to leave this century.',jp:'蚊取り線香。この世紀を出るには十分だ。'}))},
+ {x:72,y:74,w:19,h:16,t:{en:'Big crate',jp:'大箱'},mark:1,act:()=>say(T({en:'Manifest: “POOL & BOAT EQUIPMENT — to the changing room, ALL OF IT”. The stencilled arrow points down the corridor.',jp:'送り状：「プール・船舶装備 — 脱衣室へ、すべて」。型押し矢印は廊下を指している。'}))},
+ {x:89.5,y:62,w:9,h:18,t:{en:'Back to the bar',jp:'バーへ戻る'},nav:'bar'}
+]});
+defRoom('corr1',{n:{en:'GROUND CORRIDOR',jp:'1F廊下'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#151b29')}${floorP()}
+${door(60,380,170,430)}
+${door(980,400,170,410)}<text x="1010" y="392" font-size="26" fill="#7d8898" font-family="monospace">GEN.</text>
+${door(1300,380,180,430)}<text x="1330" y="372" font-size="26" fill="#7d8898" font-family="monospace">KITCHEN</text>
+${win(560,180,220,300)}
+<g><rect x="820" y="210" width="220" height="150" fill="none" stroke="#33415e" stroke-width="4"/><g transform="rotate(-6 930 285)" fill="#cfc3a2" opacity=".85"><rect x="840" y="230" width="80" height="104"/><rect x="936" y="236" width="80" height="98"/></g><text x="858" y="290" font-size="20" fill="#8f2f2f" font-family="monospace">CLOSED</text><text x="852" y="318" font-size="18" fill="#6f6446" font-family="serif">since · 1998</text></g>
+<g><path d="M196 640 q40 -30 60 -4" stroke="#5b4c30" stroke-width="3" fill="none"/></g>
+${fl('genrun')?'<rect x="1008" y="430" width="114" height="80" fill="url(#ggl)" opacity=".5"/>':''}
+${cob(0,58,1.2)}${cob(760,180,1)}${cob(1600,56,-1.1)}
+<ellipse cx="700" cy="850" rx="70" ry="16" fill="#38404f" opacity=".4"/>
+</svg>`,
+nav:[{to:'lobby',x:17,y:60,a:'◀'},{to:'stairs',x:50,y:34,a:'▲'},{to:'kitchen',x:87,y:60,a:'➜'}],
+h:[
+ {x:58,y:31,w:13.5,h:10,rep:1,t:{en:'Notice',jp:'掲示'},mark:1,act:()=>say(T({en:'An emergency plan. Someone has circled the generator room and written: “the sea gets one light. give it two.”',jp:'避難計画図。誰かが発電機室を丸囲みし書き足している：「海には灯をひとつやれ。二つやれ」。'}))},
+ {x:12.5,y:71,w:7,h:8,rep:1,t:{en:'Wallpaper peeling',jp:'剥がれた壁紙'},mark:1,act:()=>say(T({en:'Under the wallpaper: older wallpaper with a lighthouse pattern. Someone has scratched a tally beside it — 741 days.',jp:'壁紙の下に古い壁紙。灯台柄。誰かが正の字を刻んでいる——741日分。'}))},
+ {x:63,y:46,w:10.5,h:44,t:{en:'Generator door',jp:'発電機室の扉'},nav:'gen'},
+ {x:86,y:60,w:11.5,h:42,t:{en:'Kitchen door',jp:'キッチン扉'},nav:'kitchen'},
+ {x:45,y:30,w:11,h:12,t:{en:'Upstairs',jp:'二階へ'},nav:'stairs'},
+ {x:39,y:27,w:13.5,h:18,rep:1,t:{en:'Dark window',jp:'暗い窓'},mark:1,act:()=>say(T({en:'The courtyard fountain, dry and full of leaves.',jp:'中庭の噴水は乾き、葉に埋まっている。'}))}
+]});
+defRoom('gen',{n:{en:'GENERATOR ROOM',jp:'発電機室'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}<path d="M0 0 H1600 V700 Q1000 660 600 700 Q300 726 0 696 Z" fill="#12161e"/><path d="M0 0 H1600 V70 Q1000 106 500 62 Z" fill="#080b12"/><rect y="690" width="1600" height="210" fill="#0d1219"/><g stroke="#0a0e14" stroke-width="3"><path d="M0 760 H1600 M240 690 V900 M640 690 V900 M1040 690 V900 M1400 690 V900"/></g>
+<g stroke="#3a4558" stroke-width="9" fill="none"><path d="M120 120 H540 V240 M700 90 H1480 V300 M1480 300 V520" stroke-linecap="round"/></g>
+<g><rect x="500" y="470" width="500" height="250" rx="14" fill="#1c2430" stroke="#3a4558" stroke-width="5"/><rect x="540" y="380" width="160" height="90" rx="8" fill="#242e3c" stroke="#3a4558" stroke-width="4"/><circle cx="900" cy="590" r="60" fill="#141b24" stroke="#3a4558" stroke-width="5"/><circle cx="900" cy="590" r="26" fill="#1d2734"/><rect x="560" y="720" width="90" height="40" fill="#131a22" stroke="#3a4558" stroke-width="3"/><path d="M1000 470 q80 -60 0 -110" stroke="#3a4558" stroke-width="7" fill="none"/></g>
+<g><rect x="220" y="300" width="190" height="230" rx="8" fill="#18223a" stroke="#33415e" stroke-width="5"/><g fill="#0f1826"><rect x="240" y="330" width="150" height="52"/><rect x="240" y="400" width="150" height="52"/><rect x="240" y="470" width="150" height="42"/></g>${fl('fuseok')?'<circle cx="315" cy="426" r="10" fill="#8fe3ff"/><circle cx="315" cy="426" r="26" fill="url(#ggl2)"/>':'<circle cx="315" cy="426" r="7" fill="#7c5b2a"/>'}</g>
+<g><rect x="1180" y="290" width="230" height="290" rx="8" fill="#20293a" stroke="#42536f" stroke-width="6"/>${fl('breakopen')?'<rect x="1200" y="310" width="190" height="140" fill="#0f1826"/><rect x="1270" y="330" width="50" height="90" rx="6" fill="'+(fl('breaker')?'#8fe3ff':'#5b6b85')+'"/><path d="M1295 420 V360" stroke="'+(fl('breaker')?'#eaf7ff':'#232c3a')+'" stroke-width="8" stroke-linecap="round"/>':'<path d="M1270 430 a22 22 0 1 1 44 0 v30 h-44 z" fill="#8d97a8" stroke="#42536f" stroke-width="4"/><circle cx="1292" cy="444" r="8" fill="#20293a"/>'}</g>
+${fl('genrun')?'<circle cx="900" cy="590" r="120" fill="url(#ggl)" opacity=".35"/><circle cx="900" cy="590" r="26" fill="#ffe9a9"/>':'<circle cx="900" cy="590" r="26" fill="#232c3a"/>'}
+${door(40,420,160,400)}
+${cob(1600,64,-1.2)}${cob(150,80,.9)}
+<g stroke="#3a4558" stroke-width="3" fill="none" opacity=".6"><path d="M1120 780 h220 v-60 M1340 720 h120"/></g>
+</svg>`,
+nav:[{to:'corr1',x:7,y:62,a:'◀'}],
+h:[
+ {x:19.5,y:37,w:12.5,h:19,t:{en:'Fuse panel',jp:'ヒューズ盤'},mark:1,cond:()=>!fl('fuseok'),act:()=>{
+   fusePanel(()=>{sf('fuseok');say(T({en:'The new fuse seats with a satisfying clunk. Power is waiting at the breaker now.',jp:'新しいヒューズが気持ちよく収まる。次はブレーカーだ。'}));});}},
+ {x:19.5,y:37,w:12.5,h:19,rep:1,t:{en:'Fuse panel',jp:'ヒューズ盤'},cond:()=>fl('fuseok'),mark:1,act:()=>say(T({en:'All three sockets live now. Somewhere a relay hums happily.',jp:'3口とも生きている。どこかでリレーが嬉しそうに唸る。'}))},
+ {x:80.5,y:39,w:14.5,h:20,t:{en:'Breaker cabinet',jp:'ブレーカー盤'},mark:1,cond:()=>!fl('breakopen'),item:'crowbar',auto:1,act:()=>{
+   sf('breakopen');sfxCreak();
+   say(T({en:'The padlock surrenders. Inside: one fat breaker, already warm, as if someone was about to flip it.',jp:'南京錠が降伏する。中に太いブレーカーがひとつ。誰かが入れようとしたかのように、既に温かい。'}));$('#scene').innerHTML=art('gen');renderHots(ROOMS['gen']);}},
+ {x:80.5,y:34,w:14.5,h:11,rep:1,t:{en:'Breaker',jp:'ブレーカー'},mark:1,cond:()=>fl('breakopen')&&!fl('breaker'),act:()=>{
+   if(!fl('fuseok')){say(T({en:'Dead. The fuse panel must be repaired first.',jp:'死んでいる。先にヒューズ盤を直せ。'}));return false;}
+   sf('breaker');sfxSolved();say(T({en:'The breaker slams home. The whole room lights — and far away, a pump wakes up.',jp:'ブレーカーが叩き込まれる。部屋全体が灯る——遠くでポンプが息を吹き返す。'}));$('#scene').innerHTML=art('gen');}},
+ {x:72,y:66,w:22,h:16,t:{en:'Generator',jp:'発電機'},mark:1,rep:1,act:()=>{
+   if(fl('genrun')){say(T({en:'It runs steady now, ticking like a patient heart.',jp:'今は安定運転。忍耐強い心臓のように時を刻む。'}));return;}
+   if(!fl('fuel')){say(T({en:'No fuel. The tank cap is rusted but it will turn.',jp:'燃料なし。タンクキャップは錆びているが回る。'}));return false;}
+   if(!has('matchbox')){say(T({en:'The pre-heater is cold. It needs a real flame.',jp:'予熱ヒーターが冷たい。本物の火が必要だ。'}));return false;}
+   take('matchbox');sf('genrun');sfxThunder();
+   say(T({en:'The first match fails. The second catches. The generator coughs, swears, and roars to life. The resort has a heartbeat again.',jp:'一本目のマッチは失敗。二本目が捉えた。発電機は咳をし、悪態をつき、唸って息を吹き返す。リゾートに再び脈が戻った。'}));$('#scene').innerHTML=art('gen');}},
+ {x:50,y:47,w:9,h:8,rep:1,t:{en:'Fuel gauge',jp:'燃料計'},mark:1,act:()=>{
+   if(fl('fuel')){say(T({en:'The needle sits high. The tank is full.',jp:'針は上。タンクは満タンだ。'}));}
+   else say(T({en:'The gauge reads E, and the glass is crusted dry.',jp:'計器はE。ガラスはカラカラに乾いている。'}));}},
+ {x:66,y:42,w:7,h:7,t:{en:'Fuel tank cap',jp:'燃料タンクのキャップ'},mark:1,cond:()=>!fl('fuel'),item:'oil',auto:1,act:()=>{
+   take('oil');sf('fuel');sfxSplash();
+   say(T({en:'You pour the diesel oil into the generator tank, cap off, swearing quietly at the rust. The gauge climbs.',jp:'キャップを外し、軽油をタンクへ。錆に悪態をつきながら注ぐ。針が上がっていく。'}));
+   $('#scene').innerHTML=art('gen');renderHots(ROOMS['gen']);}},
+ {x:66,y:42,w:7,h:7,rep:1,t:{en:'Fuel tank cap',jp:'燃料タンクのキャップ'},cond:()=>fl('fuel'),mark:1,act:()=>say(T({en:'Sealed tight. The tank sloshes when you knock on it.',jp:'固く閉じた。ノックするとタンクは揺れて音を立てる。'}))},
+ {x:7,y:62,w:8,h:20,t:{en:'Corridor door',jp:'廊下の扉'},nav:'corr1'}
+]});
+/* ================= 2F ================= */
+defRoom('stairs',{n:{en:'GRAND STAIRCASE',jp:'グランド階段'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#151c2a')}${floorP()}
+<g fill="#1a2436" stroke="#2c3a52" stroke-width="4">
+<path d="M760 900 L840 900 L840 840 L770 840 Z"/><path d="M770 840 L852 840 L852 780 L782 780 Z"/><path d="M782 780 L866 780 L866 720 L794 720 Z"/><path d="M794 720 L880 720 L880 660 L806 660 Z"/><path d="M806 660 L896 660 L896 600 L818 600 Z"/><path d="M818 600 L912 600 L912 540 L830 540 Z"/><path d="M830 540 L928 540 L928 480 L842 480 Z"/><path d="M842 480 L946 480 L946 430 L854 430 Z"/></g>
+<g stroke="#33415e" stroke-width="6" fill="none"><path d="M740 900 L830 420 M860 900 L966 430" opacity=".8"/><path d="M742 860 L832 440" opacity=".3"/></g>
+<g stroke="#33415e" stroke-width="4"><path d="M760 880 v-60 M800 830 v-60 M840 770 v-60 M860 700 v-60 M880 640 v-60 M900 570 v-60 M920 500 v-50"/></g>
+${win(1180,140,250,320)}<polygon points="1190,460 1430,150 1560,760 1140,900" fill="#9fc0e8" opacity="0.05"/>
+${door(300,400,190,410)}<text x="316" y="392" font-size="24" fill="#7d8898" font-family="monospace">DOWN · LOBBY</text>
+<g><rect x="1000" y="330" width="120" height="90" fill="none" stroke="#33415e" stroke-width="4"/><path d="M1008 338 L1112 412 M1112 338 L1008 412" stroke="#41546f" stroke-width="3"/></g>
+${cob(300,120,1)}${cob(1600,58,-1.3)}
+<text x="860" y="380" font-size="30" fill="#5d5335" font-family="serif" letter-spacing="6">2F</text>
+</svg>`,
+nav:[{to:'corr1',x:21,y:62,a:'▼'},{to:'corr2',x:52,y:30,a:'▲'}],
+h:[
+ {x:58,y:52,w:8,h:34,rep:1,t:{en:'Bannister',jp:'手すり'},mark:1,act:()=>say(T({en:'Dust in a perfect layer, except— the rail is worn smooth where a hundred hands slid down in a hurry.',jp:'埃は完璧な膜。ただし手すりだけは滑らかに磨耗している——百人の手が急いで滑り降りた跡だ。'}))},
+ {x:81,y:34,w:15.5,h:20,rep:1,t:{en:'Window landing',jp:'踊り場の窓'},mark:1,act:()=>say(T({en:'From here you can see the whole resort: dark windows, the dry fountain, and the lighthouse standing like a bone.',jp:'ここから見渡せる：全室の暗い窓、乾いた噴水、そして一本の骨のように立つ灯台。'}))},
+ {x:68,y:39,w:7.5,h:10,rep:1,t:{en:'Framed photo',jp:'写真額'},mark:1,act:()=>say(T({en:'Opening night, 1971. Staff in white lined up on the pier. The lighthouse beam behind them — and someone has scratched out one face on the far left.',jp:'オープニングナイト、1971。桟橋に白い制服のスタッフ。背後に灯台の光——一番左の顔だけが消し去られている。'}))},
+ {x:22.5,y:60,w:12,h:22,t:{en:'Down to the corridor',jp:'1F廊下へ'},nav:'corr1'}
+]});
+defRoom('corr2',{n:{en:'SECOND FLOOR',jp:'2F廊下'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#161d2c')}${floorP()}
+${door(300,400,180,410)}<text x="330" y="392" font-size="30" fill="#8d97a8" font-family="monospace">201</text>
+${door(1100,400,180,410)}<text x="1130" y="392" font-size="30" fill="#8d97a8" font-family="monospace">205</text>
+${door(700,410,170,400)}
+<g><rect x="520" y="170" width="190" height="130" fill="#10161f" stroke="#3a4558" stroke-width="5"/><path d="M530 288 l40 -100 M580 300 l60 -120" stroke="#2c3a52" stroke-width="4" fill="none"/><rect x="505" y="300" width="220" height="30" fill="#18223a" transform="rotate(-18 615 315)"/></g>
+<g><path d="M118 0 V400 M1482 0 V400" stroke="#2c3a52" stroke-width="4"/><path d="M100 330 q60 -40 120 -6 M1380 330 q60 -40 120 -6" stroke="#33415e" stroke-width="6" fill="none"/></g>
+${cob(0,60,1.1)}${cob(1600,58,-1.1)}${cob(900,170,.8)}
+<g stroke="#41546f" stroke-width="3" fill="none" opacity=".5"><path d="M920 120 q40 60 20 140 M940 120 q-30 80 10 150"/></g>
+<ellipse cx="900" cy="860" rx="90" ry="18" fill="#38404f" opacity=".4"/>
+</svg>`,
+nav:[{to:'stairs',x:50,y:38,a:'▼'},{to:'r201',x:23.5,y:62,a:'➜'},{to:'r205',x:73.5,y:62,a:'➜',cond:()=>fl('shelf')}],
+h:[
+ {x:19,y:58,w:11.5,h:26,t:{en:'Room 201',jp:'客室 201'},nav:'r201'},
+ {x:72,y:58,w:11.5,h:26,t:{en:'Room 205',jp:'客室 205'},mark:1,cond:()=>!fl('shelf'),act:()=>{
+   say(T({en:'The door is buried under a fallen shelf and fifty years of luggage. It will give, if you throw your weight at it.',jp:'扉は倒れた棚と五十年分の荷物に埋もれている。体重を懸ければ、開くかもしれない。'}));return false;}},
+ {x:72,y:58,w:11.5,h:26,t:{en:'Room 205',jp:'客室 205'},cond:()=>fl('shelf'),nav:'r205'},
+ {x:63,y:55,w:9.5,h:4.5,t:{en:'Fallen shelf',jp:'倒れた棚'},mark:1,rep:1,cond:()=>!fl('shelf'),act:()=>{
+   sf('shelf');sfxCreak();sfxSplash();
+   say(T({en:'You brace and heave. Books, a hairdryer and a century of dust come loose. Behind them: room 205.',jp:'踏ん張って押す。本、ヘアドライヤー、百年分の埃が崩れる。その向こうに205号室。'}));
+   sf('v_r205');$('#scene').innerHTML=art('corr2');renderHots(ROOMS['corr2']);}},
+ {x:37,y:25,w:12.5,h:11,rep:1,t:{en:'Broken AC unit',jp:'壊れた空調'},mark:1,act:()=>say(T({en:'Ripped from the wall. Graffiti inside the housing: “2 4 8 — nice try”. A false lead, someone got there first.',jp:'壁から引き剥がされている。筐体の落書き：「2 4 8 — よくやった」。偽者だ、先に誰かが仕掛けている。'}))},
+ {x:7,y:71,w:13,h:8,rep:1,t:{en:'Peeling wallpaper',jp:'壁紙'},mark:1,act:()=>say(T({en:'Behind the paper: faint pencil marks, all over the wall — the number 7, 1 and 9 written again and again, each one circled in a different hand.',jp:'紙の下にうっすら鉛筆の跡——7、1、9が何度も、違う筆跡で丸を添えて反復されている。'}))},
+ {x:90,y:62,w:9,h:16,t:{en:'Stair railing',jp:'階段の手すり'},mark:1,act:()=>say(T({en:'A child\'s shoe sits neatly on the rail, toes pointing at room 205. You leave it where it is. Somehow that feels correct.',jp:'階段の手すりに子供靴が丁寧に置かれ、つま先は205号室を向いている。そのままにしておこう。なぜか、それが正しい気がする。'}))}
+]});
+defRoom('r201',{n:{en:'ROOM 201',jp:'客室 201'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#1a2030')}${floorP()}
+${door(1380,410,180,400)}
+<g><rect x="820" y="600" width="330" height="180" rx="10" fill="#243349" stroke="#33415e" stroke-width="4"/><rect x="840" y="560" width="290" height="60" rx="8" fill="#1c2739" stroke="#33415e" stroke-width="3"/><g fill="#2c3a52"><rect x="850" y="620" width="270" height="34" rx="6"/></g><path d="M1150 780 v60 M830 780 v60" stroke="#141c2b" stroke-width="6"/></g>
+<g><rect x="1180" y="640" width="120" height="90" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="1190" y="652" width="100" height="26" fill="#141c2b"/><path d="M1240 640 v-24" stroke="#4a3620" stroke-width="3"/><circle cx="1240" cy="610" r="18" fill="url(#ggl)" opacity="${''}0"/></g>
+<g><rect x="1210" y="560" width="70" height="52" rx="6" fill="#2a2418" stroke="#4a3620" stroke-width="3"/><g fill="#cfc3a2"><rect x="1218" y="570" width="54" height="6"/><rect x="1218" y="582" width="54" height="6"/></g><circle cx="1256" cy="600" r="5" fill="${fl('radio')?'#8fe3ff':'#3a4558'}"/>${fl('radio')?'<circle cx="1256" cy="600" r="16" fill="url(#ggl2)"/>':''}</g>
+${fl('tilt201')
+ ?'<g><rect x="330" y="290" width="230" height="150" rx="6" fill="#1c2739" stroke="#c9a95f" stroke-width="6" transform="rotate(-6 445 365)"/><path d="M350 440 l30 130 M520 440 l-40 130" stroke="#0b101a" stroke-width="10"/><rect x="360" y="470" width="170" height="120" fill="#0e1420" stroke="#33415e" stroke-width="4"/><text x="384" y="546" font-size="44" fill="#8d97a8" font-family="monospace">7 1 9</text></g>'
+ :'<g><rect x="330" y="290" width="230" height="150" rx="6" fill="#241a10" stroke="#c9a95f" stroke-width="6"/><path d="M350 440 l20 130 M540 440 l-30 130" stroke="#0b101a" stroke-width="10"/><g><circle cx="410" cy="360" r="34" fill="#e8d9a0"/><path d="M560 300 l-30 60 M590 320 l-40 80" stroke="#3a4558" stroke-width="4" fill="none"/><path d="M340 420 h210" stroke="#12110c" stroke-width="6"/></g></g>'}
+<g><rect x="120" y="520" width="180" height="260" fill="#1d150c" stroke="#33251a" stroke-width="5"/><g stroke="#33251a" stroke-width="4"><path d="M210 520 V780 M120 610 h180 M120 700 h180"/></g></g>
+${win(650,160,230,300)}<polygon points="660,460 880,170 980,700 600,860" fill="#9fc0e8" opacity="0.05"/>
+<g fill="#cfc3a2" opacity=".5"><rect x="640" y="700" width="90" height="60" rx="4" transform="rotate(4 685 730)"/></g>
+${cob(1600,60,-1)}
+</svg>`,
+nav:[{to:'corr2',x:90.5,y:60,a:'◀'}],
+h:[
+ {x:28,y:38,w:15,h:10,t:{en:'Big painting: “The Night Ferry”',jp:'大きな絵：「夜行フェリー」'},mark:1,cond:()=>!fl('tilt201'),act:()=>{
+   say(T({en:'A heavy oil painting, hanging slightly crooked. It could be tilted up out of its frame.',jp:'重たい油絵、少し歪んで掛かっている。枠から持ち上げて傾けられそうだ。'}));return false;}},
+ {x:28,y:38,w:15,h:10,mark:1,rep:1,cond:()=>fl('tilt201'),t:{en:'Tilted painting',jp:'傾いた絵'},act:()=>say(T({en:'Behind the painting: a niche cut into the wall, and numbers painted in plain grey — 7 1 9. Too plain to be sure they matter. A lamp that sees in the dark would tell you more.',jp:'絵の裏：壁に穿たれた龕、ありふれた灰色で塗られた数字——7 1 9。あまりにありふれた数字で、本当に重要かはわからない。闇を見るランプが答えを教えてくれる。'}))},
+ {x:34.5,y:23.5,w:4.5,h:3.5,rep:1,t:{en:'Tilt it up',jp:'絵を持ち上げる'},cond:()=>!fl('tilt201'),mark:1,act:()=>{
+   sf('tilt201');sfxCreak();
+   say(T({en:'The frame lifts out of its hook and tilts up, revealing a niche in the wall.',jp:'枠が鈎から外れて持ち上がり、壁の龕が現れる。'}));
+   $('#scene').innerHTML=art('r201');renderHots(ROOMS['r201']);}},
+ {x:78.5,y:65,w:7,h:6,t:{en:'Bedside radio',jp:'ベッドサイドのラジオ'},mark:1,cond:()=>!fl('radio'),item:'batteries',act:()=>{
+   sf('radio');sfxSolved();
+   say(T({en:'Fresh batteries bite home. The radio clears its throat and plays THE resort theme — six notes, slow and bright: C - E - G - E - C - E.',jp:'新しい電池が噛みつく。ラジオが咳払いをして、リゾートのテーマを流す——6つの音、ゆっくりと明るく：C - E - G - E - C - E。'}));}},
+ {x:78.5,y:65,w:7,h:6,rep:1,t:{en:'Radio',jp:'ラジオ'},cond:()=>fl('radio'),mark:1,act:()=>{
+   [261.6,329.6,392,329.6,261.6,329.6].forEach((f,i)=>tone(f,0,.5,'triangle',.18,i*.28));
+   say(T({en:'“Azure Moon”, the house theme: C - E - G - E - C - E. Then weather, and static, and something under the static that is not weather.',jp:'「Azure Moon」、館のテーマ：C-E-G-E-C-E。その後に天気予報とノイズ、そしてノイズの下に、天候ではない何か。'}));}},
+ {x:60,y:70,w:19,h:14,rep:1,t:{en:'Bed',jp:'ベッド'},mark:1,act:()=>say(T({en:'Made with hospital corners. On the pillow: an impression of a face that never lay there.',jp:'病院式の角まで完璧に整えられたベッド。枕には、そこに横たわったことのない顔の跡。'}))},
+ {x:11.5,y:70,w:11.5,h:20,rep:1,t:{en:'Wardrobe',jp:'クローゼット'},mark:1,act:()=>say(T({en:'Staff uniforms, pressed. Pockets full of complimentary mints and one very old key-shaped candy.',jp:'アイロンがけ済みのスタッフユニフォーム。ポケットにはサービス品のミントと、古い鍵型の飴がひとつ。'}))},
+ {x:49,y:34,w:14.5,h:20,rep:1,t:{en:'Window',jp:'窓'},mark:1,act:()=>say(T({en:'The pool, black and glassy. Something circles it. You decide it is the moon\'s reflection.',jp:'黒く鏡のようなプール。何かが周回している。それは月の反射だと決める。'}))},
+ {x:89.5,y:62,w:9,h:18,t:{en:'Door',jp:'ドア'},nav:'corr2'}
+]});
+defRoom('r205',{n:{en:'ROOM 205',jp:'客室 205'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#1a1f30')}${floorP()}
+${door(1380,410,180,400)}
+<g><rect x="820" y="600" width="320" height="180" rx="10" fill="#243349" stroke="#33415e" stroke-width="4"/><rect x="840" y="560" width="280" height="60" rx="8" fill="#1c2739" stroke="#33415e" stroke-width="3"/><path d="M1140 780 v60 M830 780 v60" stroke="#141c2b" stroke-width="6"/></g>
+<g><rect x="1180" y="650" width="150" height="80" fill="#241a10" stroke="#4a3620" stroke-width="4"/><path d="M1180 690 h150" stroke="#33251a" stroke-width="3"/><circle cx="1255" cy="672" r="5" fill="#c9a95f"/></g>
+<g><rect x="1204" y="606" width="86" height="40" rx="8" fill="#3a2118" stroke="#6b3a24" stroke-width="3"/><g fill="#e8c877"><circle cx="1224" cy="622" r="4"/><circle cx="1240" cy="630" r="4"/><circle cx="1258" cy="618" r="4"/></g></g>
+<g><rect x="120" y="500" width="200" height="290" fill="#1d150c" stroke="#33251a" stroke-width="5"/><g stroke="#33251a" stroke-width="4"><path d="M220 500 V790"/></g><g fill="#2a2418"><rect x="150" y="560" width="40" height="120"/><rect x="250" y="560" width="40" height="120"/></g></g>
+${fl('shelf')?'':'<g><rect x="1240" y="430" width="330" height="130" fill="#241a10" stroke="#4a3620" stroke-width="5" transform="rotate(12 1405 495)"/><g fill="#1d150c" transform="rotate(12 1405 495)"><rect x="1270" y="450" width="60" height="90"/><rect x="1360" y="440" width="70" height="100"/><rect x="1460" y="460" width="60" height="80"/></g><path d="M1250 600 l300 40" stroke="#33251a" stroke-width="6"/></g>'}
+${fl('wallnum')?'<g><path d="M600 240 q140 -40 280 10" stroke="#8fe3ff" stroke-width="10" fill="none" opacity=".5"/><text x="620" y="320" font-size="76" fill="#9fe8ff" font-family="monospace" opacity=".9">7 · 1 · 9</text></g>':'<g><rect x="560" y="200" width="360" height="220" fill="#141a28" stroke="#22304a" stroke-width="4"/><path d="M600 240 q140 -30 280 6" stroke="#1d2842" stroke-width="10" fill="none"/></g>'}
+${win(980,150,210,290)}
+${cob(0,58,1.2)}
+<ellipse cx="760" cy="852" rx="80" ry="16" fill="#38404f" opacity=".45"/>
+</svg>`,
+nav:[{to:'corr2',x:90.5,y:60,a:'◀'}],
+h:[
+ {x:19.5,y:70,w:12.5,h:24,t:{en:'Wardrobe',jp:'クローゼット'},mark:1,act:()=>{
+   if(!fl('shelf')){say(T({en:'Wedged by the fallen shelf. Later.',jp:'倒れた棚に食い止められている。後でだ。'}));return false;}
+   say(T({en:'Resort uniforms and a name tag: “KEEPER”. Under the pockets — moths have had their dinner.',jp:'リゾートのユニフォームとネームタグ：「KEEPER（灯台守）」。ポケットの中は蛾の晩餐後だ。'}));}},
+ {x:79,y:71,w:10.5,h:9,t:{en:'Music box on the dresser',jp:'ドレッサーのオルゴール'},mark:1,rep:1,cond:()=>!fl('musicsolved'),act:()=>{
+   musicLock(()=>{sf('musicsolved');sfxDoor();give('cashkey');
+     say(T({en:'The cylinder locks to the right tune and a hidden panel sighs open. Inside: a small brass key stamped CASH — the register key.',jp:'シリンダーが正しい旋律で噛合い、隠しパネルが溜息を開く。中に真鍮の小さな鍵「CASH」——出納台の鍵だ。'}));});}},
+ {x:79,y:71,w:10.5,h:9,rep:1,t:{en:'Music box',jp:'オルゴール'},cond:()=>fl('musicsolved'),mark:1,act:()=>{
+   [261.6,329.6,392,329.6,261.6,329.6].forEach((f,i)=>tone(f,0,.5,'triangle',.16,i*.28));
+   say(T({en:'You wind it again. Six notes, and the room seems to stand at attention.',jp:'もう一度巻く。6つの音、部屋が姿勢を正す気がする。'}));}},
+ {x:42,y:30,w:18,h:16,rep:1,t:{en:'A dark patch of wall',jp:'暗い壁の一角'},mark:1,act:()=>{
+   if(has('uv')){if(fl('wallnum')){say(T({en:'The mark still glows: 7 - 1 - 9. Written in ink that only light like a deep-sea creature makes.',jp:'文字はまだ光る：7-1-9。深海生物のような光でしか現れないインクだ。'}));return;}
+     sf('wallnum');sfxSolved();say(T({en:'Under the UV glow the wall ignites: 7 · 1 · 9, ringed by tiny drawn moons. Someone wanted this found only by true light.',jp:'UVの下で壁が燃える：7 · 1 · 9、小さな月の落書き。これは“本物の光”でのみ見つけてほしかったようだ。'}));
+     $('#scene').innerHTML=art('r205');}
+   else{say(T({en:'The wall is bare here — but the wallpaper has a strange sheen, like ink that drinks light. You need a lamp that shows what ordinary light hides.',jp:'この壁は剥き出しだ——壁紙は奇妙な光沢、光を飲むインクのようだ。普通の光では見えないものを見せるランプが必要だ。'}));}}},
+ {x:24,y:46,w:6.5,h:4.5,rep:1,t:{en:'Under the bed',jp:'ベッドの下'},mark:1,act:()=>say(T({en:'Suitcases. All of them unpacked, folded, waiting for owners who never came back for them.',jp:'スーツケース。すべて開梱され、畳まれ、戻ってこない持ち主を待っている。'}))},
+ {x:65,y:33,w:13.5,h:18,rep:1,t:{en:'Window',jp:'窓'},mark:1,act:()=>say(T({en:'Directly at the lighthouse. From this angle its top room is exactly at eye level — as if someone is standing there with a lamp.',jp:'まさに灯台正面。この角度では灯台の灯室が目の高さと同じ——誰かがランプを持って立っているかのように。'}))},
+ {x:89.5,y:62,w:9,h:18,t:{en:'Door',jp:'ドア'},nav:'corr2'}
+]});
+/* ================= KITCHEN & RESTAURANT ================= */
+defRoom('kitchen',{n:{en:'COMMERCIAL KITCHEN',jp:'業務用キッチン'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#141a26')}${floorP()}
+<g><rect x="1300" y="300" width="180" height="500" rx="8" fill="#242e3c" stroke="#42536f" stroke-width="5"/><path d="M1310 340 h160 M1310 640 h160" stroke="#42536f" stroke-width="3"/><path d="M1320 380 v220" stroke="#8d97a8" stroke-width="6" stroke-linecap="round"/><text x="1330" y="330" font-size="20" fill="#7d8898" font-family="monospace">-4°C</text></g>
+<g><rect x="620" y="480" width="320" height="70" fill="#2b3342" stroke="#42536f" stroke-width="4"/><rect x="640" y="550" width="280" height="260" fill="#1d242f" stroke="#42536f" stroke-width="4"/><g fill="#161c26"><circle cx="700" cy="515" r="16"/><circle cx="790" cy="515" r="16"/><circle cx="870" cy="515" r="16"/></g><rect x="660" y="600" width="240" height="160" fill="#131922" stroke="#42536f" stroke-width="3"/><path d="M780 600 v160" stroke="#42536f" stroke-width="3"/></g>
+<g><rect x="620" y="300" width="150" height="70" rx="6" fill="#cfd6e0" stroke="#8d97a8" stroke-width="3"/><rect x="640" y="322" width="70" height="34" rx="4" fill="#241a10"/><path d="M760 315 q26 -18 40 0" stroke="#8d97a8" stroke-width="4" fill="none"/></g>
+<g><rect x="200" y="520" width="700" height="50" fill="#39455a" stroke="#54627a" stroke-width="4"/><rect x="230" y="570" width="640" height="240" fill="#1d242f" stroke="#39455a" stroke-width="4"/><g stroke="#39455a" stroke-width="3"><path d="M230 660 h640 M450 570 V810 M660 570 V810"/></g><path d="M300 615 h80" stroke="#8d97a8" stroke-width="5" stroke-linecap="round"/></g>
+<g fill="#8d97a8"><circle cx="360" cy="300" r="14"/><path d="M346 300 v40 M374 300 v40" stroke="#8d97a8" stroke-width="3"/></g>
+<g><rect x="1180" y="200" width="140" height="80" fill="none" stroke="#3a4558" stroke-width="4"/><path d="M1190 210 l120 60 M1310 210 l-120 60" stroke="#41546f" stroke-width="3"/></g>
+${door(120,420,160,400)}
+${win(980,140,200,280)}
+<g fill="#cfc3a2" opacity=".5"><rect x="1020" y="720" width="120" height="40" rx="8"/><path d="M1040 720 q40 -40 80 0" stroke="#cfc3a2" stroke-width="6" fill="none"/></g>
+${cob(0,56,1.1)}${cob(1600,54,-1.2)}
+</svg>`,
+nav:[{to:'corr1',x:12.5,y:62,a:'◀'},{to:'rest',x:88,y:62,a:'➜'}],
+h:[
+ {x:86,y:56,w:11.5,h:30,t:{en:'Big fridge',jp:'大型冷蔵庫'},mark:1,rep:1,act:()=>{
+   let got=false;
+   if(no('batteries')){give('batteries');looted('batteries');got=true;say(T({en:'Inside the fridge: on the top shelf, a sealed pack of D batteries — left by someone who meant to come back.',jp:'冷蔵庫の上段に未開封の単三電池——戻ってくるつもりで誰かが置いたものだ。'}));}
+   if(no('fuse')&&!got){give('fuse');looted('fuse');got=true;say(T({en:'In the fridge door: a ceramic spare fuse wrapped in an oily rag. 30 amps.',jp:'冷蔵庫の扉ポケットに、油汚れの布に包まれた陶器の予備ヒューズ。30A。'}));}
+   if(no('bread')&&!got){give('bread');looted('bread');got=true;say(T({en:'A heel of bread, still soft. Wrong, and you take it anyway.',jp:'パンの耳、まだ柔らかい。おかしい、が貰う。'}));}
+   if(!got)say(T({en:'Empty, humming politely. The cold is the only fresh thing left in this resort.',jp:'空、丁寧に唸っている。冷気はこのリゾートで唯一の新鮮なものだ。'}));}},
+ {x:42,y:71,w:11.5,h:7,t:{en:'Cutlery drawer',jp:'引き出し'},mark:1,act:()=>{
+   if(no('crowbar')){give('crowbar');looted('crowbar');say(T({en:'No cutlery — one rusted crowbar laid carefully among the ladles, like silverware. Someone with a dark sense of humour.',jp:'カトラリーがない——お玉の間に、一本の錆びたバールが銀食器のように丁寧に並んでいる。ブラックジョークの分かる誰かだ。'}));}
+   else say(T({en:'Ladles, skillets, and the memory of a crowbar.',jp:'お玉とフライパン、そしてバールだった記憶。'}));}},
+ {x:52,y:55,w:10.5,h:7,rep:1,t:{en:'Stove',jp:'コンロ'},mark:1,act:()=>say(T({en:'Burnt to a gloss. The pans are welded to the burners by fifty years of supper.',jp:'艶が出るほど燃え、鍋は五十年分の夕食でバーナーに溶接されている。'}))},
+ {x:45,y:38,w:9.5,h:8,t:{en:'Toaster',jp:'トースター'},mark:1,act:()=>{
+   if(no('bread')){give('bread');looted('bread');say(T({en:'You press the lever — and out jumps a slice of bread, warm. You catch it before you think.',jp:'レバーを押す——パンが一切れ、温かいまま飛び出してくる。考える前に掴む。'}));}
+   else say(T({en:'It pops politely at nothing, like a trained dog.',jp:'訓練された犬のように、何にもないものに丁寧に弾を合わせる。'}));}},
+ {x:62,y:37,w:12.5,h:15,rep:1,t:{en:'Pass-through window',jp:'配膳口'},mark:1,act:()=>say(T({en:'Through the hatch, the dining hall. You can hear plates being set — one, two, three — and then the sound stops, embarrassed.',jp:'配膳口の向こうは食堂。皿が置かれる音——1、2、3——そして気まずそうに音は止まる。'}))},
+ {x:12.5,y:62,w:9,h:18,t:{en:'Corridor door',jp:'廊下の扉'},nav:'corr1'},
+ {x:88,y:62,w:11,h:18,t:{en:'To dining hall',jp:'食堂へ'},nav:'rest'}
+]});
+defRoom('rest',{n:{en:'DINING HALL',jp:'ダイニングホール'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#182034')}${floorP()}
+<ellipse cx="800" cy="800" rx="420" ry="90" fill="#1d2a3d" stroke="#2c3a52" stroke-width="4" opacity=".7"/>
+${win(180,110,210,330)}${win(1180,110,210,330)}
+<g><rect x="740" y="0" width="6" height="90" fill="#2c3648"/><ellipse cx="743" cy="112" rx="70" ry="16" fill="#3a3122" stroke="#5b4c30" stroke-width="3"/><g fill="#caa85f" opacity=".8"><circle cx="700" cy="136" r="5"/><circle cx="743" cy="150" r="5"/><circle cx="786" cy="136" r="5"/></g></g>
+<g><path d="M420 640 h260 v-26 h-260z" fill="#243349"/><rect x="440" y="640" width="26" height="100" fill="#141c2b"/><rect x="640" y="640" width="26" height="100" fill="#141c2b"/><g fill="#cfc3a2" opacity=".6"><rect x="470" y="606" width="70" height="10" rx="3"/><rect x="580" y="602" width="60" height="14" rx="4"/></g></g>
+<g><path d="M900 700 h260 v-26 h-260z" fill="#243349"/><rect x="920" y="700" width="26" height="100" fill="#141c2b"/><rect x="1120" y="700" width="26" height="100" fill="#141c2b"/></g>
+<g><rect x="90" y="470" width="180" height="120" fill="#1d150c" stroke="#33251a" stroke-width="4"/><path d="M90 590 v180 M270 590 v180" stroke="#33251a" stroke-width="6"/><g fill="#2c5540"><rect x="120" y="430" width="18" height="40" rx="4"/><rect x="150" y="422" width="14" height="48" rx="4"/><rect x="180" y="436" width="18" height="34" rx="4"/></g></g>
+<g><rect x="1390" y="420" width="180" height="400" fill="#12100c" stroke="#33415e" stroke-width="4"/><path d="M1390 420 h180" stroke="#c9a95f" stroke-width="3"/><text x="1414" y="470" font-size="22" fill="#7d8898" font-family="serif">EXIT</text></g>
+${cob(0,54,1.2)}${cob(1600,52,-1.2)}
+<ellipse cx="560" cy="878" rx="70" ry="14" fill="#38404f" opacity=".4"/>
+</svg>`,
+nav:[{to:'kitchen',x:92,y:62,a:'◀'},{to:'garden',x:7,y:62,a:'➜'}],
+h:[
+ {x:13,y:62,w:11.5,h:18,t:{en:'Side door to the garden',jp:'庭への裏口'},nav:'garden'},
+ {x:6,y:60,w:6,h:12,t:{en:'EXIT sign',jp:'EXIT標識'},mark:1,rep:1,act:()=>say(T({en:'The exit door is chained from the outside, and the chain is welded. Whoever locked this place wanted to keep something in, not out.',jp:'出口は外から鎖で、溶接されている。ここを閉じた者は、外へ出すためでなく内へ閉じるために鍵をかけた。'}))},
+ {x:11.5,y:55,w:11.5,h:14,rep:1,t:{en:'Buffet table',jp:'ビュッフェ台'},mark:1,act:()=>say(T({en:'Fake food behind glass. One of the plastic prawns has been replaced with a real one, dried to a fossil. Someone was bored beyond language.',jp:'硝子の後の偽物の料理。プラスチックの海老の一つが、実物の化石に換わっている。誰かが言語を越えて退屈していた。'}))},
+ {x:40,y:70,w:13,h:7,rep:1,t:{en:'Dinner table',jp:'夕食のテーブル'},mark:1,act:()=>say(T({en:'Set for two. One chair is pulled out farther than the other, for fifty years straight.',jp:'二人分のセッティング。片方の椅子だけが、五十年間ずっと、少し引き出しっぱなしだ。'}))},
+ {x:64,y:13,w:9.5,h:10,rep:1,t:{en:'Chandelier',jp:'照明'},mark:1,act:()=>say(T({en:'A chandelier shaped like a school of fish. They all point toward the door to the beach.',jp:'魚群の形をした照明。全匹がビーチ側の扉を指している。'}))},
+ {x:90,y:62,w:11.5,h:20,t:{en:'To the kitchen',jp:'キッチンへ'},nav:'kitchen'}
+]});
+/* ================= WATERFRONT ================= */
+defRoom('garden',{n:{en:'GARDEN & ORCHARD',jp:'庭園と果樹園'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}
+<path d="M0 600 Q400 570 800 604 Q1200 636 1600 600 V900 H0 Z" fill="#17211a"/>
+<g stroke="#101812" stroke-width="2" opacity=".5"><path d="M0 700 Q500 676 1600 706 M0 800 Q600 776 1600 806"/></g>
+<g><circle cx="700" cy="700" r="150" fill="#22303e" stroke="#33415e" stroke-width="6"/><circle cx="700" cy="700" r="104" fill="#18242f"/><circle cx="700" cy="700" r="58" fill="#22303e"/><rect x="688" y="580" width="24" height="120" fill="#33415e"/><ellipse cx="700" cy="580" rx="42" ry="12" fill="#3a4558"/><g fill="#2c5540" opacity=".7"><ellipse cx="666" cy="686" rx="14" ry="6"/><ellipse cx="740" cy="716" rx="12" ry="5"/></g></g>
+<g transform="translate(1030 470)"><path d="M0 130 Q-8 40 6 -10" stroke="#3a2f1d" stroke-width="12" fill="none"/><g fill="#2c5540"><path d="M6 -10 q-60 -34 -100 -6 q48 36 100 6z"/><path d="M6 -10 q64 -26 96 8 q-52 30 -96 -8z"/><path d="M2 26 q-52 4 -70 36 q46 10 70 -36z"/><path d="M4 40 q48 12 62 44 q-46 6 -62 -44z"/></g></g>
+<g transform="translate(300 430)"><path d="M0 170 Q-10 60 4 -6" stroke="#3a2f1d" stroke-width="14" fill="none"/><g fill="#264a38"><path d="M4 -6 q-66 -30 -104 0 q50 38 104 0z"/><path d="M4 -6 q66 -22 98 12 q-54 28 -98 -12z"/><path d="M0 40 q-54 8 -68 40 q46 8 68 -40z"/></g></g>
+<g transform="translate(1250 620)"><rect x="0" y="-150" width="230" height="150" fill="#1c150c" stroke="#33251a" stroke-width="4"/><path d="M-16 -150 L115 -212 L246 -150 Z" fill="#241a10" stroke="#33251a" stroke-width="4"/><rect x="86" y="-120" width="66" height="120" fill="#12100c" stroke="#4a3620" stroke-width="4"/><text x="16" y="-160" font-size="24" fill="#c9a95f" font-family="serif">POOL BAR</text></g>
+<g><rect x="120" y="500" width="210" height="150" fill="#1c150c" stroke="#33251a" stroke-width="4"/><path d="M120 500 l210 150 M330 500 l-210 150" stroke="#4a3620" stroke-width="6"/>${fl('storewin')?'<path d="M150 520 l60 40" stroke="#05080e" stroke-width="16"/>':''}</g>
+<g><rect x="1370" y="392" width="160" height="112" fill="#101812" stroke="#33415e" stroke-width="4"/><rect x="1378" y="292" width="26" height="112" fill="#33415e"/><text x="1390" y="352" font-size="24" fill="#7d8898" font-family="monospace" transform="rotate(90 1400 350)">LIGHTHOUSE</text><path d="M1470 504 h60 v60" stroke="#33415e" stroke-width="4" fill="none"/></g>
+<g><rect x="620" y="470" width="230" height="180" fill="#241a10" stroke="#4a3620" stroke-width="5"/><path d="M620 470 L850 650 M850 470 L620 650" stroke="#4a3620" stroke-width="7"/></g>
+<g fill="#2c5540" opacity=".8"><circle cx="420" cy="760" r="30"/><circle cx="480" cy="800" r="22"/><circle cx="980" cy="790" r="26"/></g>
+${wave(880)}
+</svg>`,
+nav:[{to:'rest',x:5,y:62,a:'◀'},{to:'beach',x:5,y:80,a:'◀'},{to:'store',x:21,y:62,a:'◀',cond:()=>fl('storewin')},{to:'pool',x:94,y:72,a:'➜'}],
+h:[
+ {x:13.5,y:67,w:13.5,h:16,t:{en:'Storage window',jp:'物置の窓'},mark:1,cond:()=>fl('storewin'),nav:'store'},
+ {x:43,y:68,w:14.5,h:20,t:{en:'Padlocked shed door',jp:'板で塞がれた通用口'},mark:1,rep:1,act:()=>say(T({en:'The shed door is padlocked from inside — useless. The storage window is the way.',jp:'小屋の扉は内側から錠前。使えない。物置の窓が正道だ。'}))},
+ {x:83,y:60,w:12.5,h:13,t:{en:'Lighthouse gate',jp:'灯台への通用口'},mark:1,rep:1,act:()=>{say(T({en:'The gate stands open. A concrete path climbs the rocks toward the tower. Of course the resort kept the lighthouse attached — of course.',jp:'通用口は開いている。コンクリートの道が岩を登り塔へ続く。リゾートが灯台と繋がっているのは当然だ——当然なのだ。'}));sf('v_lhout');}},
+ {x:83,y:60,w:12.5,h:13,rep:1,t:{en:'To the LIGHTHOUSE',jp:'灯台へ'},cond:()=>true,nav:'lhout',mark:1},
+ {x:82.5,y:57,w:12,h:9,t:{en:'Pool Bar door',jp:'プールバーの扉'},nav:'poolbar'},
+ {x:44,y:76,w:9.5,h:8,rep:1,t:{en:'Flower bed',jp:'花壇'},mark:1,act:()=>{if(no('bait')){give('bait');sf('soilok');say(T({en:'Dead roses. You turn the soil anyway and find earthworms, fat and unbothered. They will make excellent bait.',jp:'枯れた薔薇。とにかく土を返ると、肥った蚯蚓が平然と現れる。いい餌になる。'}));}else say(T({en:'The soil has given up its worms.',jp:'土は蚯蚓を差し出した。'}));}},
+ {x:44,y:78,w:14.5,h:11,rep:1,t:{en:'Fountain',jp:'噴水'},mark:1,act:()=>say(T({en:'Dry basins, dead leaves, and a single live goldfish looking at you with pure complaint.',jp:'乾いた受、枯れ葉、そしてまるで不平を言うような目をした金色の金魚が一匹。'}))},
+ {x:64.5,y:74,w:8,h:6,rep:1,t:{en:'Bench',jp:'ベンチ'},mark:1,act:()=>say(T({en:'Two people sat here once. The wood has memorized the difference between them.',jp:'かつて二人が座った。木は二人の違いを記憶している。'}))}
+]});
+defRoom('pool',{n:{en:'POOL DECK',jp:'プールデッキ'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}
+<path d="M0 560 Q800 540 1600 560 V900 H0 Z" fill="#243447"/>
+<rect x="300" y="590" width="900" height="230" rx="16" fill="url(#gpit)" stroke="#3a4558" stroke-width="8"/>
+<g fill="#8fe3ff" opacity=".18"><path d="M330 640 q60 14 120 0 t120 0 t120 0 t120 0 t120 0" stroke="#8fe3ff" stroke-width="3" fill="none"/><path d="M340 700 q60 14 120 0 t120 0 t120 0 t120 0 t110 0" stroke="#8fe3ff" stroke-width="3" fill="none"/><path d="M330 760 q60 14 120 0 t120 0 t120 0 t120 0 t120 0" stroke="#8fe3ff" stroke-width="3" fill="none"/></g>
+<g stroke="#3a4558" stroke-width="7" fill="none"><path d="M330 590 v-60 M330 530 h34"/></g>
+<rect x="280" y="520" width="120" height="26" rx="8" fill="#39455a"/>
+<g><rect x="1250" y="560" width="26" height="180" fill="#39455a"/><path d="M1236 740 h54 v34 h-54z" fill="#39455a"/><path d="M1240 560 l40 -20" stroke="#c0392b" stroke-width="8" stroke-linecap="round"/><circle cx="1284" cy="540" r="16" fill="none" stroke="#c0392b" stroke-width="7"/><path d="M1268 534 h32 M1284 518 v32" stroke="#e8eef7" stroke-width="4"/></g>
+<g><rect x="540" y="770" width="60" height="40" fill="#1a2836" stroke="#3a4558" stroke-width="4"/><g stroke="#3a4558" stroke-width="3"><path d="M550 770 v40 M565 770 v40 M580 770 v40"/></g>${fl('poollock')?'<path d="M600 770 l60 -30" stroke="#3a4558" stroke-width="6" fill="none"/><rect x="600" y="770" width="60" height="40" fill="#05080e"/>':''}</g>
+${fl('poollock')?'':'<g><rect x="1388" y="380" width="150" height="270" fill="#1c150c" stroke="#33251a" stroke-width="5"/><path d="M1388 380 l150 270 M1538 380 l-150 270" stroke="#4a3620" stroke-width="7"/></g>'}
+<g fill="#c9a95f"><g transform="translate(90 700)"><path d="M0 0 h150 v14 h-150z" fill="#39455a"/><path d="M0 14 h150 l-20 40 h-110z" fill="#2c5540"/><path d="M10 -6 l30 -60 20 60" fill="#39455a"/></g></g>
+<g><rect x="1420" y="180" width="150" height="180" fill="#241a10" stroke="#4a3620" stroke-width="4"/><text x="1440" y="240" font-size="26" fill="#7d8898" font-family="serif">POOL</text><text x="1444" y="276" font-size="26" fill="#7d8898" font-family="serif">BAR</text><path d="M1490 360 v190" stroke="#4a3620" stroke-width="6"/></g>
+<g><rect x="90" y="360" width="160" height="130" fill="#241a10" stroke="#4a3620" stroke-width="4"/><text x="112" y="430" font-size="30" fill="#c9a95f" font-family="serif">CHANGE</text></g>
+${wave(860)}
+${wave(560)}
+</svg>`,
+nav:[{to:'garden',x:5,y:64,a:'◀'},{to:'poolbar',x:90,y:30,a:'➜'},{to:'changeroom',x:94,y:60,a:'➜',cond:()=>fl('poollock')}],
+h:[
+ {x:34,y:56,w:8.5,h:5.5,rep:1,t:{en:'Diving board',jp:'飛込台'},mark:1,act:()=>say(T({en:'You stand on the board and look down into the black water. Something glints far at the bottom, near the skimmer. And then, when you blink, it is gone.',jp:'板の上に立ち黒い水を見下ろす。底のスキマー付近で何かが一瞬光る。瞬きすると、消えている。'}))},
+ {x:37,y:86,w:8.5,h:6,t:{en:'Pool skimmer',jp:'プールスキマー'},mark:1,cond:()=>!fl('fishgo'),item:'rod',act:()=>{
+   sf('fishgo');sfxSplash();sfxSolved();give('fish');give('ekey');
+   say(T({en:'You bait the line with the bread-and-worm and drop it to the glint. A tug — you haul, and up comes the catch: a fat fish hooked through a T-shaped ENGINE KEY.',jp:'パンとミミズを針に掛け、光る底へ落とす。アタリ——引き揚げると、釣れたのは魚。T字型のエンジンキーに針が掛かっている。'}));}},
+  {x:37,y:86,w:8.5,h:6,t:{en:'Pool skimmer — something glints below',jp:'プールスキマー——下に何かが光る'},mark:1,cond:()=>!fl('fishgo')&&!has('rod'),item:'bait',auto:1,act:()=>{
+    take('bait');sf('fishgo');sfxSplash();sfxSolved();give('fish');give('ekey');
+    say(T({en:'You tie the worms to a candy wrapper and lower it in, like offering tribute to a god. Something takes the bait — and what surfaces is a fat fish, hooked through a T-shaped ENGINE KEY.',jp:'ミミズを飴の包み紙に縛り付け、神への供物のように下に下ろす。何かがかかる——浮かび上がったのは肥った魚。T字型のエンジンキーに掛かっていた。'}));}},
+ {x:37,y:86,w:8.5,h:6,rep:1,t:{en:'Pool skimmer',jp:'プールスキマー'},cond:()=>fl('fishgo'),mark:1,act:()=>say(T({en:'The water closes over the secret like a healed wound.',jp:'水は秘密を、治った傷のように閉じる。'}))},
+ {x:80,y:59,w:9,h:13,rep:1,t:{en:'Lifeguard chair',jp:'ライフガード台'},mark:1,act:()=>say(T({en:'The chair is empty and will always be empty. A loudhailer hangs from it. The life-ring on the rail is printed with a rescue-club number: 4 2 7.',jp:'台は空で、永遠に空だろう。拡声器が下がる。手すりのライフリングには救助隊の番号：4 2 7。'}))},
+ {x:92,y:56,w:11,h:20,t:{en:'Hidden door in the wall',jp:'壁の隠し扉'},mark:1,cond:()=>!fl('poollock'),act:()=>{
+   say(T({en:'A seam in the tile wall — the door to the changing room is jambed. The frame is made of cheap pool resin; the right tune from the bar jukebox used to pop these panels.',jp:'タイル壁の継ぎ目——脱衣室の扉が詰まっている。枠は安いプール用樹脂。バーのジュークボックスで正しい一曲を流すと解錠された筈だ。'}));return false;}},
+ {x:92,y:56,w:11,h:20,t:{en:'To the changing room',jp:'脱衣室へ'},cond:()=>fl('poollock'),nav:'changeroom'},
+ {x:93,y:32,w:10.5,h:12,t:{en:'Pool Bar',jp:'プールバー'},nav:'poolbar'},
+ {x:10,y:75,w:9.5,h:8,rep:1,t:{en:'Lounger',jp:'ラウンジャー'},mark:1,act:()=>say(T({en:'One lounger is set up for sunbathing. It is midnight in November.',jp:'一つのラウンジャーが日光浴用にセットされている。今は11月の真夜中だ。'}))},
+ {x:13,y:49,w:11,h:11,t:{en:'Changing room door',jp:'脱衣室扉'},mark:1,cond:()=>!fl('poollock'),act:()=>{
+   say(T({en:'The door won’t move. A small sign: “AUTOMATIC LOCK — plays by request from Palm Bar”. The bar, then.',jp:'扉は動かない。小さな札：「自動ロック — パームバーよりご所望の一曲で解錠」。バーだ、やるなら。'}));return false;}},
+ {x:13,y:49,w:11,h:11,t:{en:'Changing room door',jp:'脱衣室扉'},cond:()=>fl('poollock'),nav:'changeroom'}
+]});
+defRoom('changeroom',{n:{en:'CHANGING ROOM',jp:'脱衣室'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#17202e')}${floorP()}
+<g><rect x="120" y="190" width="620" height="470" fill="#1d3348" stroke="#2c554a" stroke-width="4"/><g stroke="#14232f" stroke-width="4"><path d="M275 190 V660 M430 190 V660 M585 190 V660 M120 420 H740"/></g>
+<g fill="#14232f"><rect x="245" y="300" width="18" height="8"/><rect x="400" y="300" width="18" height="8"/><rect x="555" y="300" width="18" height="8"/><rect x="245" y="530" width="18" height="8"/><rect x="400" y="530" width="18" height="8"/><rect x="555" y="530" width="18" height="8"/></g>
+${fl('poollock')?'<rect x="430" y="420" width="155" height="240" fill="#05080e"/><rect x="440" y="440" width="60" height="200" fill="#1d3348" transform="rotate(14 470 540)"/><g stroke="#c9a95f" stroke-width="4" fill="none"><path d="M520 640 q40 -30 60 -80"/></g><text x="470" y="560" font-size="44" fill="#c9a95f" font-family="monospace">427</text>':'<rect x="430" y="420" width="155" height="240" fill="#1d3348" stroke="#2c554a" stroke-width="4"/><circle cx="570" cy="540" r="10" fill="#c9a95f"/>'}
+</g>
+<g><rect x="840" y="240" width="180" height="300" fill="#16202f" stroke="#33415e" stroke-width="6"/><g stroke="#22304a" stroke-width="3"><path d="M840 330 h180 M840 440 h180 M930 240 v300"/></g><path d="M850 250 l160 280" stroke="#2c3a52" stroke-width="4"/></g>
+<g><rect x="1100" y="580" width="280" height="70" rx="10" fill="#39455a"/><path d="M1120 650 v130 M1360 650 v130" stroke="#39455a" stroke-width="6"/></g>
+<g><rect x="1440" y="520" width="110" height="170" rx="8" fill="#1d242f" stroke="#39455a" stroke-width="4"/><path d="M1440 560 h110" stroke="#39455a" stroke-width="4"/></g>
+<g><rect x="1050" y="180" width="120" height="60" fill="none" stroke="#3a4558" stroke-width="4"/><path d="M1110 240 v40" stroke="#3a4558" stroke-width="5"/><circle cx="1110" cy="292" r="14" fill="none" stroke="#3a4558" stroke-width="4"/></g>
+${door(60,420,150,380)}
+${cob(1600,60,-1)}
+<g fill="#cfc3a2" opacity=".5"><rect x="1150" y="620" width="40" height="26" rx="4"/><rect x="1230" y="618" width="44" height="30" rx="4"/></g>
+</svg>`,
+nav:[{to:'pool',x:94,y:62,a:'◀'}],
+h:[
+ {x:27,y:58,w:12,h:16,t:{en:'Locker #4',jp:'ロッカー4番'},mark:1,cond:()=>!fl('poollock'),act:()=>{
+   say(T({en:'Locked with a three-dial padlock. The resort printed its numbers on everything — posters, rings, towels.',jp:'ダイヤル式錠。リゾートはあらゆるものに数字を刷り込んでいた——ポスターも、リングも、タオルも。'}));return false;}},
+ {x:27,y:58,w:12,h:16,mark:1,cond:()=>!fl('lock4'),act:()=>{
+   numLock(T({en:'Padlock: three dials',jp:'南京錠：3つのダイヤル'}),'427',()=>{sf('lock4');
+     say(T({en:'The dials click to 4-2-7 and the locker breathes open.',jp:'ダイヤルが4-2-7で解かれ、ロッカーが息を開く。'}));
+     $('#scene').innerHTML=art('changeroom');renderHots(ROOMS['changeroom']);});}},
+ {x:27,y:58,w:12,h:16,t:{en:'Open locker',jp:'開いたロッカー'},mark:1,cond:()=>fl('lock4')&&no('rod'),act:()=>{
+   give('rod');looted('rod');
+   say(T({en:'Inside: a bamboo fishing rod, and a note — “fish don’t steal keys. but something here does. bait something dumb.”',jp:'中に竹の釣竿とメモ：「魚は鍵を盗まない。だが ここにいる何かは盗む。間抜けなものを餌にしろ」。'}));}},
+ {x:55,y:42,w:11,h:16,rep:1,t:{en:'Mirror',jp:'鏡'},mark:1,act:()=>say(T({en:'You check your reflection. It checks yours back, a half-second slower than physics allows.',jp:'自分の姿を確かめる。鏡は物理が許すより0.5秒遅れて、あなたを確かめ返す。'}))},
+ {x:74.5,y:69,w:17.5,h:9,rep:1,t:{en:'Bench',jp:'ベンチ'},mark:1,act:()=>say(T({en:'Under the bench, a pair of flip-flops, sizes mismatched, as if whoever wore them left in a hurry — or was never wearing them at all.',jp:'ベンチの下に、左右でサイズ違いのビーチサンダル。誰かが急いで脱いでいったように——あるいは最初から誰も履いていなかったように。'}))},
+ {x:94.5,y:67,w:8.5,h:13,rep:1,t:{en:'Trash can',jp:'ゴミ箱'},mark:1,act:()=>say(T({en:'Candy wrappers, ticket stubs, and one perfect paper crane folded from a closing notice.',jp:'飴の包み紙、半券、そして閉館告知から折られた折り鶴が一只。'}))},
+ {x:70,y:29,w:7.5,h:7,rep:1,t:{en:'Shower',jp:'シャワー'},mark:1,act:()=>say(T({en:'Salt water. It sprays on its own once, politely, then stops.',jp:'塩水。一度だけ礼儀正しく自分から噴き、止まる。'}))},
+ {x:4.5,y:62,w:8,h:18,t:{en:'Back to pool deck',jp:'プールデッキへ'},nav:'pool'}
+]});
+defRoom('poolbar',{n:{en:'POOL BAR',jp:'プールバー'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}
+<path d="M0 600 Q800 576 1600 600 V900 H0 Z" fill="#243447"/>
+<g><rect x="520" y="360" width="560" height="240" fill="#1c150c" stroke="#33251a" stroke-width="5"/><path d="M500 360 L800 240 L1100 360 Z" fill="#241a10" stroke="#33251a" stroke-width="5"/>
+<rect x="560" y="600" width="480" height="60" fill="#241a10" stroke="#4a3620" stroke-width="4"/><rect x="580" y="660" width="440" height="150" fill="#1d150c" stroke="#33251a" stroke-width="4"/>
+<g stroke="#33251a" stroke-width="3"><path d="M720 660 V810 M900 660 V810"/></g></g>
+<g><rect x="1080" y="470" width="90" height="130" fill="#2b3342" stroke="#42536f" stroke-width="4"/><path d="M1080 510 h90" stroke="#42536f" stroke-width="3"/><path d="M1120 530 v40" stroke="#8d97a8" stroke-width="5" stroke-linecap="round"/></g>
+<g fill="#cfc3a2" opacity=".6"><rect x="640" y="576" width="60" height="24" rx="6"/><g fill="#2c5540"><rect x="600" y="540" width="14" height="36"/><rect x="622" y="534" width="12" height="42"/></g></g>
+<g fill="#39455a"><path d="M420 700 h90 v20 h-90z"/><path d="M450 720 v80"/></g>
+<g transform="translate(1230 300)"><path d="M0 0 q-8 -50 4 -80" stroke="#4a3620" stroke-width="6" fill="none"/><rect x="-18" y="-120" width="36" height="42" rx="6" fill="#243349"/><circle cx="0" cy="-99" r="20" fill="${fl('matchbox')?'url(#ggl)':'#10161f'}"/></g>
+<g><rect x="140" y="190" width="220" height="150" fill="none" stroke="#4a3620" stroke-width="4"/><text x="166" y="256" font-size="30" fill="#c9a95f" font-family="serif">LIGHT THE</text><text x="196" y="300" font-size="30" fill="#c9a95f" font-family="serif">WAY</text></g>
+${wave(860)}
+</svg>`,
+nav:[{to:'garden',x:5,y:64,a:'◀'},{to:'pool',x:94,y:74,a:'➜'}],
+h:[
+ {x:41,y:63.5,w:7.5,h:5,t:{en:'Matchbox on the counter',jp:'カウンターのマッチ箱'},mark:1,cond:()=>no('matchbox'),act:()=>{
+   give('matchbox');looted('matchbox');
+   say(T({en:'A brass matchbox left by the register, still full. Whoever sat here was planning to light something.',jp:'レジの脇に、中身が満タンの真鍮マッチ箱。ここに座った者は、何かを点ける予定だった。'}));}},
+ {x:69,y:59,w:6.5,h:9,t:{en:'Fridge',jp:'冷蔵庫'},mark:1,rep:1,act:()=>say(T({en:'Bottles of lime cordial, all still sealed, all somehow still cold.',jp:'ライムコーディアルの瓶。全て未開封で、全てなぜか冷たい。'}))},
+ {x:77.5,y:24,w:7,h:9,rep:1,t:{en:'Hanging lantern',jp:'吊りランプ'},mark:1,act:()=>{
+   if(has('matchbox')){say(T({en:'You strike a match and the lantern catches. Amber light spills over the water — and for a moment the pool is full of people. Then it isn\'t.',jp:'マッチを擦りランプが燃える。琥珀の光が水に——一瞬、プールは客で満たされる。そして、満たされていない。'}));sfxPickup();}
+   else say(T({en:'A hurricane lamp, wick soaked and waiting. You need fire.',jp:'ランプ、芯は浸かって待ち構えている。火が必要だ。'}));}},
+ {x:33,y:78,w:8,h:6,rep:1,t:{en:'Bar stools',jp:'スツール'},mark:1,act:()=>say(T({en:'Two stools, turned to face each other. Always two.',jp:'スツールは二脚、向き合って。いつでも二脚。'}))},
+ {x:24,y:26,w:14,h:10,rep:1,t:{en:'Neon sign',jp:'ネオン'},mark:1,act:()=>say(T({en:'“LIGHT THE WAY”. Someone added a small neon arrow under it, pointing at the beach. It works, faintly.',jp:'「LIGHT THE WAY（道を照らせ）」。誰かが小さなネオン矢印を足し、ビーチを指している。かすかに、機能している。'}))},
+ {x:5,y:64,w:6,h:14,t:{en:'Back to garden',jp:'庭へ'},nav:'garden'},
+ {x:94,y:74,w:6,h:12,t:{en:'To pool',jp:'プールへ'},nav:'pool'}
+]});
+defRoom('beach',{n:{en:'MOON BEACH',jp:'ムーンビーチ'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}${seaG(250)}${moonR(250)}
+${fl('beam')?'<g transform="translate(150 230)">'+beamFx()+'</g><path d="M144 214 a10 10 0 1 1 .1 0" fill="#ffe9a9"/><path d="M138 236 l6 -60 h12 l6 60z" fill="#0a1424"/>':'<path d="M138 236 l6 -60 h12 l6 60z" fill="#0a1424"/><circle cx="150" cy="172" r="4" fill="#22304a"/>'}
+${fl('beam')?shipFx():''}
+${wave(300)}${wave(360)}${wave(430)}${wave(500)}
+<path d="M0 520 Q400 500 800 530 Q1200 558 1600 528 V900 H0 Z" fill="#2b2f3c"/>
+<path d="M0 560 Q400 540 800 566 Q1200 590 1600 562" stroke="#3a4252" stroke-width="3" fill="none"/>
+<g><path d="M0 60 L190 90 Q380 140 430 300 L470 560 L0 590 Z" fill="#11151d"/>
+<path d="M300 380 Q330 330 400 350 L430 540 L300 545 Z" fill="#05080e"/>
+<g fill="#2a2f3a"><ellipse cx="352" cy="520" rx="42" ry="20"/><ellipse cx="408" cy="530" rx="30" ry="15"/><ellipse cx="318" cy="536" rx="24" ry="12"/></g></g>
+<g><path d="M460 340 q60 -50 130 -20 q80 40 60 130 q-30 90 -130 70 q-80 -20 -70 -110 q6 -50 10 -70z" fill="#1a2334" stroke="#2c3a52" stroke-width="5"/></g>
+<g><rect x="540" y="430" width="170" height="160" rx="16" fill="#151d2c" stroke="#33415e" stroke-width="5"/><g stroke="#33415e" stroke-width="4"><path d="M540 480 h170 M540 530 h170 M625 430 V590"/></g></g>
+<g><rect x="1240" y="430" width="160" height="110" fill="#1c150c" stroke="#33251a" stroke-width="4"/><path d="M1230 430 L1320 376 L1410 430 Z" fill="#241a10" stroke="#33251a" stroke-width="4"/><rect x="1296" y="466" width="52" height="74" fill="#0b101a" stroke="#4a3620" stroke-width="4"/><path d="M1420 500 h90" stroke="#4a3620" stroke-width="6"/></g>
+<g><rect x="940" y="520" width="180" height="18" fill="#3a2f1d"/><g stroke="#3a2f1d" stroke-width="6"><path d="M960 538 V620 M1100 538 V620"/></g><path d="M940 500 q90 -30 180 0" stroke="#cfc3a2" stroke-width="2" fill="none" opacity=".4"/></g>
+<g transform="translate(1080 585)"><circle r="14" fill="none" stroke="#c0392b" stroke-width="7"/><path d="M-14 0 h28 M0 -14 v28" stroke="#e8eef7" stroke-width="3"/></g>
+<g fill="#4a3620" opacity=".8"><path d="M700 700 q30 -20 70 -6 l-8 14 q-40 -10 -62 -8z"/><path d="M760 730 q40 -14 70 4 l-10 12 q-36 -12 -60 -16z"/></g>
+${fl('boards')?'':'<path d="M690 560 l0 -10" stroke="#33415e" stroke-width="0"/>'}
+</svg>`,
+nav:[{to:'lobby',x:42,y:52,a:'▲'},{to:'pier',x:56,y:62,a:'➜'},{to:'boath',x:83,y:64,a:'➜'},{to:'lhout',x:8,y:36,a:'▲'},{to:'cave',x:24,y:58,a:'▲',cond:()=>fl('caveopen')},{to:'garden',x:5,y:64,a:'◀'}],
+h:[
+ {x:44,y:48,w:11,h:13,rep:1,t:{en:'Arched doorway to the lobby',jp:'ロビーへのアーチ'},mark:1,act:()=>say(T({en:'Salt air and broken glass. Through the arch: the lobby, moonlit and patient.',jp:'潮と硝子。アーチの向こう：月あかりのロビー、忍耐深く。'}))},
+ {x:44,y:48,w:11,h:13,t:{en:'To the LOBBY',jp:'ロビーへ'},nav:'lobby'},
+ {x:67.5,y:64,w:11.5,h:8,rep:1,t:{en:'Life-ring post',jp:'ライフリング'},mark:1,act:()=>say(T({en:'A life-ring, bleached. Its rescue-club print repeats the resort’s favourite riddle: 4 - 2 - 7. Below, someone scratched: “it never opened”.',jp:'日焼けしたライフリング。救助隊の刻印はリゾートのお気に入りの謎を反復する：4-2-7。下に誰かの傷文字「これは一度も開かなかった」。'}))},
+ {x:46,y:79,w:9.5,h:7,rep:1,t:{en:'Driftwood pile',jp:'流木'},mark:1,act:()=>{
+   if(no('matchbox')){give('matchbox');looted('matchbox');say(T({en:'Under the driftwood: a matchbox wrapped twice in plastic bag, bone dry. The beach keeper was prepared for everything except the dark.',jp:'流木の下：ビニールで二度巻かれた、完全に乾いたマッチ箱。ビーチ番人は、闇以外のすべてに備えていた。'}));}
+   else say(T({en:'Just driftwood now, and crabs pretending to be stones.',jp:'今は流木と、石のふりをするカニだけ。'}));}},
+ {x:23.5,y:57,w:11,h:10,t:{en:'Rocks sealing the cave mouth',jp:'洞口を塞ぐ岩'},mark:1,cond:()=>!fl('caveopen'),item:'crowbar',auto:1,act:()=>{
+   sf('caveopen');sfxCreak();
+   say(T({en:'You lever the rocks aside. Cold breath comes out of the cliff, smelling of low tide and old shells. A stairway, cut by human hands.',jp:'岩を剥がす。崖から冷たい息——干潮と古い貝の匂い。人の手が彫った階段。'}));
+   sf('v_cave');$('#scene').innerHTML=art('beach');renderHots(ROOMS['beach']);}},
+ {x:23.5,y:57,w:11,h:10,t:{en:'To the CAVE',jp:'洞窟へ'},cond:()=>fl('caveopen'),nav:'cave'},
+ {x:23.5,y:44,w:7,h:11,rep:1,t:{en:'Cliff face',jp:'崖'},mark:1,act:()=>say(T({en:'Old maintenance marks cut into the rock, and a tide gauge. The cave mouth sits above the highest line it has ever marked.',jp:'岩に刻まれた整備の目印と満潮計。洞口はその計が記した最も高い線より上にある。'}))},
+ {x:78,y:51,w:10.5,h:13,t:{en:'Boathouse door',jp:'ボートガレージ'},nav:'boath'},
+ {x:7,y:34,w:11.5,h:13,t:{en:'Path to the lighthouse',jp:'灯台への道'},mark:1,act:()=>say(T({en:'A concrete path climbs the rocks to the lighthouse gate. The tower is black against the stars.',jp:'コンクリートの道が岩を登り灯台門へ。塔は星に抜けて黒い。'}))},
+ {x:7,y:34,w:11.5,h:13,t:{en:'To the LIGHTHOUSE',jp:'灯台へ'},nav:'lhout'},
+ {x:54,y:60,w:9,h:12,t:{en:'Pier',jp:'桟橋'},mark:1,act:()=>say(T({en:'The pier walks out over the bay on tired legs. A boat is moored at its end, waiting for someone braver than you. Tonight.',jp:'桟橋は疲れた脚で湾へ伸び、先端にボートが係留。今夜、お前より度胸のある者を待っている。'}))},
+ {x:54,y:60,w:9,h:12,t:{en:'To the PIER',jp:'桟橋へ'},nav:'pier'}
+]});
+defRoom('cave',{n:{en:'MOON CAVE',jp:'ムーンの洞窟'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}
+<rect width="1600" height="900" fill="#070a10"/>
+<path d="M0 0 H1600 V140 Q1200 240 800 170 Q400 100 0 190 Z" fill="#131722"/>
+<path d="M0 900 H1600 V700 Q1100 620 700 720 Q350 800 0 730 Z" fill="#0e1218"/>
+<g fill="#1a2029"><path d="M200 0 q30 140 -20 210 q-40 -90 -60 -210z"/><path d="M620 0 q20 120 -30 180 q-30 -80 -30 -180z"/><path d="M1180 0 q40 160 -10 240 q-40 -110 -40 -240z"/><path d="M400 900 q20 -120 80 -160 q10 100 -20 160z"/><path d="M1300 900 q-30 -140 30 -190 q20 110 10 190z"/></g>
+${fl('cavelit')?'<circle cx="700" cy="430" r="420" fill="url(#ggl)" opacity=".14"/>':''}
+<g><rect x="600" y="500" width="180" height="90" rx="8" fill="#1d3348" stroke="#3a4558" stroke-width="4"/><path d="M600 520 h180 M690 500 v90" stroke="#3a4558" stroke-width="3"/><circle cx="690" cy="545" r="8" fill="#c9a95f"/></g>
+<g><ellipse cx="1050" cy="640" rx="120" ry="34" fill="#10202a" stroke="#22303e" stroke-width="3"/><g stroke="#2c3a52" stroke-width="2" fill="none"><path d="M960 636 q90 12 180 0 M980 650 q80 10 150 0"/></g></g>
+<g><path d="M1250 680 q60 -30 110 10 q-40 40 -110 -10z" fill="#1a2029"/><path d="M1240 700 q90 -10 140 30" stroke="#22303e" stroke-width="4" fill="none"/></g>
+<text x="330" y="300" font-size="42" fill="#3a4558" font-family="serif" transform="rotate(-6 480 290)">THE MOON KEEPS THE CODE</text>
+<text x="360" y="360" font-size="26" fill="#2c3a52" font-family="serif">— keeper, 741 nights</text>
+<path d="M80 810 q80 -10 140 20" stroke="#22303e" stroke-width="4" fill="none"/>
+<g fill="#0c1119"><circle cx="920" cy="240" r="4"/><path d="M920 244 q-6 20 6 28" stroke="#0c1119" stroke-width="3" fill="none"/></g>
+</svg>`,
+nav:[{to:'beach',x:93,y:76,a:'➜'}],
+h:[
+ {x:44,y:60,w:12.5,h:11,t:{en:'Waterproof box',jp:'防水ケース'},mark:1,act:()=>{
+   if(no('uvbulb')){give('uvbulb');looted('uvbulb');if(has('batteries')){take('batteries');if(!has('uv'))give('uv');}
+     say(T({en:'Inside the box, nested in foam: a small violet UV bulb. If a flashlight ever needed a heart transplant, this is it.',jp:'発泡材に嵌まった小さな紫のUV球。懐中電灯の心臓移植が必要なら、これがドナーだ。'}));
+     if(has('batteries'))sf('cavelit',true);}
+   else say(T({en:'Empty foam cradle, still shaped around what it held.',jp:'空の発泡材の揺りかご、中身の形を残して。'}));}},
+ {x:66,y:71,w:9,h:7,t:{en:'Flat stone',jp:'平たい石'},mark:1,act:()=>{
+   if(no('fuse')){give('fuse');looted('fuse');say(T({en:'Under the stone: a ceramic spare fuse and a note: “for the day the lights change hands”.',jp:'石の下：陶器の予備ヒューズとメモ「灯が引き継がれる日のために」。'}));}
+   else say(T({en:'The stone keeps its circle in the dust.',jp:'石は埃の中に円形の跡を残す。'}));}},
+ {x:30,y:32,w:23,h:9,rep:1,t:{en:'Old graffiti',jp:'古い落書き'},mark:1,act:()=>say(T({en:'“THE MOON KEEPS THE CODE — keeper, 741 nights”. Below: a moon drawn around the numbers 4-2-7 with a slash through them. Wrong, someone decided. Long ago.',jp:'「コードは月が守る——灯台守、741夜」。下に、4-2-7を囲んだ月と打消し線。誰かが長い昔に“違う”と決めたのだ。'}))},
+ {x:64,y:72,w:14.5,h:9,rep:1,t:{en:'Tide pool',jp:'潮だまり'},mark:1,act:()=>say(T({en:'A mirror of black water. Anemones pulse like small slow hearts. Your face floats back, older than it should be.',jp:'黒い水の鏡。イソギンチャクが小さく遅い心臓のように脈動する。映る顔は、あるべきより年老いて見える。'}))},
+ {x:92.5,y:74,w:8,h:12,t:{en:'Back to beach',jp:'ビーチへ'},nav:'beach'}
+]});
+defRoom('boath',{n:{en:'BOATHOUSE',jp:'ボートガレージ'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${wall('#151a26')}${floorP()}
+<g><rect x="120" y="140" width="620" height="36" fill="#39455a"/><g stroke="#39455a" stroke-width="8"><path d="M180 176 V300 M700 176 V300"/></g>
+<g stroke-linecap="round"><path d="M240 220 h400" stroke="#2c3a52" stroke-width="4"/>
+<path d="M280 200 l0 44 M320 196 l0 52 M360 204 l0 36" stroke="#8d97a8" stroke-width="6"/>
+<path d="M430 206 q26 -26 52 0 M456 180 l0 40" stroke="#8d97a8" stroke-width="5" fill="none"/>
+<path d="M560 190 l40 60 M600 190 l-40 60" stroke="#c0392b" stroke-width="7"/></g>
+<text x="140" y="130" font-size="20" fill="#5d6a80" font-family="monospace">TOOLS — PUT BACK, OR ELSE</text></g>
+<g><rect x="220" y="204" width="14" height="120" fill="#7c3f2f"/><path d="M227 204 l0 -18 q22 -10 30 6" stroke="#7c3f2f" stroke-width="8" fill="none"/></g>
+<g><path d="M560 196 q40 -6 44 34 l-10 40 h-40 l-8 -40 q-4 -32 14 -34z" fill="#8a4a2f" stroke="#5c3120" stroke-width="3"/><path d="M556 230 h44" stroke="#5c3120" stroke-width="3"/></g>
+<g><rect x="900" y="560" width="120" height="160" rx="10" fill="#8a2f2f" stroke="#5c2020" stroke-width="5"/><rect x="918" y="576" width="40" height="24" rx="6" fill="#5c2020"/><path d="M1020 620 q40 -10 40 20" stroke="#5c2020" stroke-width="7" fill="none"/></g>
+<g><path d="M1080 780 q180 -120 380 -4 l-30 24 h-320z" fill="#1d2836" stroke="#33415e" stroke-width="4"/></g>
+<g><rect x="300" y="560" width="420" height="60" fill="#3a2f1d" stroke="#57452c" stroke-width="4"/><rect x="330" y="620" width="40" height="130" fill="#2c2317"/><rect x="650" y="620" width="40" height="130" fill="#2c2317"/><g fill="#39455a"><rect x="360" y="520" width="30" height="40"/><rect x="420" y="512" width="40" height="48"/></g></g>
+${door(1360,420,200,400)}
+${cob(0,60,1.2)}${cob(700,140,.8)}
+<ellipse cx="1180" cy="850" rx="120" ry="20" fill="#38404f" opacity=".4"/>
+</svg>`,
+nav:[{to:'beach',x:90,y:62,a:'◀'}],
+h:[
+ {x:15,y:28,w:7,h:13,t:{en:'Crowbar on the tool wall',jp:'工具壁のバール'},mark:1,act:()=>{
+   if(no('crowbar')){give('crowbar');looted('crowbar');say(T({en:'You lift the crowbar from its hook. The painted outline it leaves behind looks, unmistakably, like the resort\'s smiley logo.',jp:'釣針からバールを外す。壁に残った輪郭は——疑いなく——リゾートのスマイルロゴの形だ。'}));}
+   else say(T({en:'The wall keeps its painted outline.',jp:'壁は塗り残した輪郭を守っている。'}));}},
+ {x:36,y:26,w:6,h:8,t:{en:'Oil can',jp:'オイル缶'},mark:1,act:()=>{
+   if(no('oil')){give('oil');looted('oil');say(T({en:'A can of diesel oil, full and capped. Generators and grudges both run on this.',jp:'満タンの軽油缶。発電機も根にもこれが燃料だ。'}));}
+   else say(T({en:'Just the hook.',jp:'鈎だけ。'}));}},
+ {x:60,y:75,w:8.5,h:15,t:{en:'Fuel can',jp:'ガソリン缶'},mark:1,act:()=>{
+   if(no('jerry')){give('jerry');looted('jerry');say(T({en:'A red jerrycan, heavy as a promise. Half petrol, no rust.',jp:'赤いガソリン缶、約束ほどに重い。半分ガソリン、錆なし。'}));}
+   else say(T({en:'The dent in the floor where it sat for fifty years is still wet.',jp:'五十年座っていた床の窪みは、まだ濡れている。'}));}},
+ {x:40,y:64,w:9,h:8,rep:1,t:{en:'Workbench',jp:'作業台'},mark:1,act:()=>say(T({en:'Boat repairs half-finished, instructions clear: patch the hull, fill the tank, find the engine key, then GO. Someone started an escape and never —',jp:'途中で放り出されたボート修理。指示書き：船体を補修し、タンクを満たし、エンジンキーを見つけ、それから行け。誰かは脱出を始めたのだ——途中で、やめた。'}))},
+ {x:23,y:76,w:14.5,h:9,rep:1,t:{en:'Toolbox',jp:'工具箱'},mark:1,act:()=>say(T({en:'Screws, brass screws of every size, and a screwdriver left standing upright, balancing, defying physics like everything else here.',jp:'真鍮ネジ各種と、物理に逆らって直立したままのドライバー。'}))},
+ {x:85,y:83,w:24,h:8,rep:1,t:{en:'Old hull',jp:'古い船体'},mark:1,act:()=>say(T({en:'The ribs of a wooden launch, upside down like a sleeping animal. Someone carved inside the ribs, small and tired: “the boat is ready when the light is ready”.',jp:'伏せられた木造船の肋骨、眠る動物のように。肋骨の内側に小さく疲れた掘り文字：「ボートは灯の準備できた時に準備できる」。'}))},
+ {x:90,y:62,w:10,h:18,t:{en:'To the beach',jp:'ビーチへ'},nav:'beach'}
+]});
+defRoom('pier',{n:{en:'THE PIER',jp:'桟橋'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}${seaG(250)}${moonR(250)}
+${fl('beam')?'<g transform="translate(120 210)">'+beamFx()+'</g><path d="M114 226 l6 -70 h12 l6 70z" fill="#0a1424"/><circle cx="126" cy="152" r="5" fill="#ffe9a9"/>':'<path d="M114 226 l6 -70 h12 l6 70z" fill="#0a1424"/><circle cx="126" cy="152" r="4" fill="#22304a"/>'}
+${fl('beam')?shipFx():''}
+${wave(320)}${wave(420)}${wave(520)}
+<g><g fill="#2a2016"><rect x="180" y="560" width="1240" height="34"/><g stroke="#1c150c" stroke-width="3"><path d="M180 577 h1240 M260 594 V680 M420 594 V700 M620 594 V720 M820 594 V740 M1020 594 V760 M1220 594 V780 M1380 594 V800"/></g></g>
+<g stroke="#3a2f1d" stroke-width="10"><path d="M240 594 V820 M1360 594 V840 M1120 594 V830"/></g>
+<g stroke="#3a2f1d" stroke-width="6"><path d="M240 620 q120 60 240 0 M1120 620 q120 60 240 0"/></g></g>
+<g transform="translate(880 720)">
+<path d="M-220 40 q-30 -60 40 -70 l360 0 q70 10 40 70z" fill="#1d2836" stroke="#33415e" stroke-width="5"/>
+<path d="M-160 -30 h320 v20 h-320z" fill="#243349"/>
+<path d="M-120 -50 q20 -30 60 -30 h60 q40 0 60 30" fill="#1c2739" stroke="#33415e" stroke-width="4"/>
+${fl('bp')?'<rect x="-40" y="10" width="70" height="40" rx="6" fill="#3a4558" stroke="#8d97a8" stroke-width="3"/><g fill="#8d97a8"><circle cx="-28" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="-28" cy="42" r="3"/><circle cx="18" cy="42" r="3"/></g>':'<path d="M-30 20 l60 30 M-30 50 l60 -30" stroke="#05080e" stroke-width="10"/>'}
+<g transform="translate(200 -10)"><rect x="0" y="-40" width="26" height="90" fill="#242e3c" stroke="#42536f" stroke-width="4"/><circle cx="13" cy="-52" r="16" fill="none" stroke="#42536f" stroke-width="5"/>${fl('bk')?'<path d="M13 -68 v-16 h20" stroke="#c9a95f" stroke-width="6" fill="none"/><circle cx="13" cy="-52" r="16" fill="url(#ggl)"/>':''}</g>
+${fl('bf')?'<path d="M-140 -30 h60 v14 h-60z" fill="#8a2f2f"/><text x="-136" y="-18" font-size="12" fill="#c9a95f" font-family="monospace">F</text>':'<path d="M-140 -30 h60 v14 h-60z" fill="#131a22" stroke="#33415e" stroke-width="3"/>'}
+</g>
+<g><rect x="300" y="520" width="30" height="80" fill="#3a2f1d"/><circle cx="315" cy="510" r="12" fill="#1c150c"/><path d="M315 522 q40 20 60 60" stroke="#4a3620" stroke-width="5" fill="none"/></g>
+<g><rect x="1330" y="500" width="40" height="94" fill="#3a2f1d"/><path d="M1350 500 q60 30 40 94" stroke="#3a2f1d" stroke-width="8" fill="none"/></g>
+<g fill="#cfc3a2" opacity=".35"><rect x="640" y="742" width="16" height="150"/><path d="M600 780 q60 -30 120 0" stroke="#cfc3a2" stroke-width="2" fill="none"/></g>
+</svg>`,
+nav:[{to:'beach',x:6,y:60,a:'◀'}],
+h:[
+ {x:52,y:78,w:8.5,h:6,t:{en:'Hull: something is wrong',jp:'船体に穴'},mark:1,cond:()=>!fl('bp'),item:'patch',auto:1,act:()=>{
+   take('patch');sf('bp');sfxDoor();
+   say(T({en:'A fist-sized hole bored clean through the plank — through it, someone pushed a child\'s toy boat out to sea. You screw the rubber patch over it, four brass screws, and the smiley faces the water.',jp:'板を貫通した穴——そこから誰かが子供のおもちゃの舟を外洋へ押し出した。ゴム板を真鍮ネジ4本で固定し、スマイルが水面を向く。'}));
+   $('#scene').innerHTML=art('pier');renderHots(ROOMS['pier']);}},
+ {x:52,y:78,w:8.5,h:6,rep:1,t:{en:'Patched hull',jp:'補修済みの船体'},cond:()=>fl('bp'),mark:1,act:()=>say(T({en:'Watertight. The smiley keeps its promise.',jp:'水密。スマイルは約束を守る。'}))},
+ {x:70,y:64,w:7.5,h:9,t:{en:'Outboard engine',jp:'船外機'},mark:1,cond:()=>!fl('bk'),item:'ekey',auto:1,act:()=>{
+   take('ekey');sf('bk');sfxPickup();
+   say(T({en:'The T-handle turns in the keyhole like a lock that has been oiled this week. Engine: ready.',jp:'T字型ハンドルは今週給油されたかのように回る。エンジン：準備完了。'}));
+   $('#scene').innerHTML=art('pier');renderHots(ROOMS['pier']);}},
+ {x:70,y:64,w:7.5,h:9,rep:1,t:{en:'Outboard engine',jp:'船外機'},cond:()=>fl('bk'),mark:1,act:()=>say(T({en:'It waits for fuel and for you to be brave.',jp:'燃料と、お前の度胸を待っている。'}))},
+ {x:45,y:63.5,w:7,h:5,t:{en:'Fuel tank',jp:'燃料タンク'},mark:1,cond:()=>!fl('bf'),item:'jerry',auto:1,act:()=>{
+   take('jerry');sf('bf');sfxSplash();
+   say(T({en:'You fill the tank from the jerrycan. Petrol sloshes — the most honest sound in this whole resort.',jp:'ガソリンをタンクへ。液体の揺れる音——このリゾート全体で最も正直な音だ。'}));
+   $('#scene').innerHTML=art('pier');renderHots(ROOMS['pier']);}},
+ {x:45,y:63.5,w:7,h:5,rep:1,t:{en:'Fuel tank',jp:'燃料タンク'},cond:()=>fl('bf'),mark:1,act:()=>say(T({en:'Full, and smelling of possibility.',jp:'満タン。可能性の匂いがする。'}))},
+ {x:19,y:57,w:8.5,h:11,rep:1,t:{en:'Mooring post',jp:'係留柱'},mark:1,act:()=>say(T({en:'The rope is knotted in a bowline — sailors\' knot. The resort hired real sailors. The resort was not a resort. Not only.',jp:'ロープはもやい結び。本物の水夫を雇っていた。リゾートはリゾートではなかった。少なくとも、それだけではない。'}))},
+ {x:56.5,y:71,w:11,h:6,rep:1,t:{en:'The boat',jp:'ボート'},mark:1,cond:()=>!(fl('bp')&&fl('bf')&&fl('bk')),act:()=>{
+   const need=[];if(!fl('bp'))need.push(T({en:'patched',jp:'船体の補修'}));if(!fl('bf'))need.push(T({en:'filled',jp:'燃料'}));if(!fl('bk'))need.push(T({en:'an engine key',jp:'エンジンキー'}));
+   say(T({en:'The boat could run, tonight, right now — it needs: ',jp:'今夜すぐに出航できる——必要なのは：'})+need.join(' · '));}},
+ {x:56.5,y:71,w:11,h:6,t:{en:'SET SAIL',jp:'出航する'},mark:1,cond:()=>(fl('bp')&&fl('bf')&&fl('bk')),act:()=>{
+   sfxThunder();
+   say(T({en:'You cast off. The engine roars. The resort slides away into the dark—',jp:'係解き、船外機が唸る。リゾートは闇の中へ滑ってゆく——'}));
+   setTimeout(()=>endGame(fl('beam')?'true':'normal'),2200);}},
+ {x:91,y:62,w:8,h:14,t:{en:'Back along the pier',jp:'桟橋を戻る'},nav:'beach'}
+]});
+defRoom('lhout',{n:{en:'LIGHTHOUSE — EXTERIOR',jp:'灯台 — 外観'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}${sky()}${seaG(300)}${wave(360)}${wave(470)}${wave(600)}
+<path d="M0 640 Q300 580 560 660 Q900 750 1600 660 V900 H0 Z" fill="#10151e"/>
+<g><path d="M760 620 L820 620 L866 240 L714 240 Z" fill="#161d2c" stroke="#2c3a52" stroke-width="6"/>
+<g stroke="#2c3a52" stroke-width="4"><path d="M726 320 h148 M736 420 h128 M748 520 h104"/></g>
+<rect x="686" y="196" width="208" height="46" fill="#1d2836" stroke="#33415e" stroke-width="5"/>
+<rect x="736" y="120" width="108" height="78" fill="#0d1520" stroke="#33415e" stroke-width="5"/>
+<path d="M726 120 L790 78 L854 120 Z" fill="#243349" stroke="#33415e" stroke-width="5"/>
+<g stroke="#33415e" stroke-width="3"><path d="M762 120 v78 M818 120 v78"/></g>
+${fl('beam')?'<circle cx="790" cy="158" r="20" fill="#ffe9a9"/><circle cx="790" cy="158" r="80" fill="url(#ggl)"/><g transform="translate(790 158)"><g class="beamsw"><polygon points="60,-18 -640,-190 -640,154 60,18" fill="#ffe9a9" opacity="0.10"/><polygon points="-60,-18 640,-140 640,204 -60,18" fill="#ffe9a9" opacity="0.08"/></g></g>':'<circle cx="790" cy="158" r="14" fill="#1a2434"/>'}
+<rect x="756" y="500" width="68" height="120" fill="${fl('lhopen')?'#05080e':'#243349'}" stroke="#42536f" stroke-width="6"/>
+${fl('lhopen')?'':'<path d="M766 540 h48 M766 580 h48" stroke="#1a2434" stroke-width="4"/>'}
+</g>
+<g stroke="#2c3a52" stroke-width="6" fill="none"><path d="M870 210 h60 v40" opacity=".6"/></g>
+<g fill="#2c5540" opacity=".6"><circle cx="520" cy="700" r="26"/><circle cx="1080" cy="710" r="22"/><circle cx="960" cy="760" r="30"/></g>
+<g><path d="M120 700 l60 -30 60 30 M240 700 l40 -20 40 20" stroke="#1a2434" stroke-width="4" fill="none"/></g>
+${fl('beam')?'<g><circle cx="1290" cy="330" r="4" fill="#8fe3ff"/><circle cx="1330" cy="336" r="4" fill="#8fe3ff"/><circle cx="1370" cy="342" r="4" fill="#8fe3ff"/><path d="M1270 340 q110 30 220 6" stroke="#8fe3ff" stroke-width="2" fill="none" opacity=".5"/></g>':''}
+</svg>`,
+nav:[{to:'beach',x:6,y:72,a:'◀'},{to:'garden',x:94,y:72,a:'➜'}],
+h:[
+ {x:49.5,y:61.5,w:8.5,h:14,t:{en:'Lighthouse door',jp:'灯台の扉'},mark:1,cond:()=>!fl('lhopen'),item:'lhkey',auto:1,act:()=>{
+   take('lhkey');sf('lhopen');sfxDoor();
+   say(T({en:'The long key turns with the weight of ceremony. The door opens onto a smell of brass, salt and kerosene. A spiral stair climbs into the tower.',jp:'長い鍵が儀式のような重量で回る。扉の向こうは真鍮と塩と灯油の匂い。螺旋階段が塔へ登る。'}));
+   $('#scene').innerHTML=art('lhout');renderHots(ROOMS['lhout']);}},
+ {x:49.5,y:61.5,w:8.5,h:14,t:{en:'Into the LIGHTHOUSE',jp:'灯台へ'},cond:()=>fl('lhopen'),mark:1,nav:'lhin'},
+ {x:49,y:15,w:14,h:11,rep:1,t:{en:'The lamp room',jp:'灯室'},mark:1,act:()=>say(T({en:'Behind the glass of the lamp room, the great lens waits, dusted but perfect. It is a first-order Fresnel. Real lighthouses use these. Someone paid a fortune for this “resort” toy.',jp:'硝子の向こうに巨大なレンズ、埃を被るが完全。一等フレネルレンズだ。本物の灯台に使う型だ。誰かがこの「リゾート」の玩具に大金を払った。'}))},
+ {x:7,y:70,w:9,h:12,t:{en:'Rocks and tide pools',jp:'岩場と潮溜り'},mark:1,act:()=>say(T({en:'The sea chews the rocks below. It is high tide by the look of it — you could not have reached this door from the water.',jp:'海が足元の岩を噛む。満潮だ——この扉に水側から辿り着くことはできなかった。'}))},
+ {x:6,y:72,w:7,h:12,t:{en:'Back to the beach',jp:'ビーチへ'},nav:'beach'},
+ {x:94,y:72,w:7,h:12,t:{en:'Path to garden',jp:'庭園への道'},nav:'garden'}
+]});
+defRoom('lhin',{n:{en:'LIGHTHOUSE — LAMP ROOM',jp:'灯台 — 灯室'},
+a:()=>`<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">${defs()}
+<rect width="1600" height="900" fill="#0a0f18"/>
+<g><rect x="180" y="0" width="1240" height="900" fill="#0d1420"/><g stroke="#1c2434" stroke-width="4"><path d="M180 150 h1240 M180 320 h1240 M180 490 h1240 M180 660 h1240"/></g></g>
+<g><rect x="560" y="130" width="480" height="300" fill="#101825" stroke="#33415e" stroke-width="6"/>
+<g stroke="#33415e" stroke-width="3"><path d="M640 130 v300 M720 130 v300 M800 130 v300 M880 130 v300 M960 130 v300"/></g>
+<g fill="#0d1a30" opacity=".8"><rect x="566" y="136" width="468" height="288"/></g>
+<g><circle cx="800" cy="280" r="110" fill="#0f1b2a" stroke="#42536f" stroke-width="6"/><g stroke="#5a6b85" stroke-width="3" fill="none"><circle cx="800" cy="280" r="78"/><circle cx="800" cy="280" r="46"/></g>
+${fl('beam')?'<circle cx="800" cy="280" r="40" fill="#ffe9a9"/><circle cx="800" cy="280" r="180" fill="url(#ggl)"/><g transform="translate(800 280)"><g class="beamsw"><polygon points="120,-24 -560,-230 -560,182 120,24" fill="#ffe9a9" opacity="0.10"/><polygon points="-120,-24 560,-160 560,260 -120,24" fill="#ffe9a9" opacity="0.08"/></g></g>':'<circle cx="800" cy="280" r="34" fill="#141e2c"/>'}</g></g>
+<g stroke="#243349" stroke-width="5" fill="none"><path d="M1120 860 q-40 -180 20 -360 q40 -120 160 -160"/></g>
+<g stroke="#243349" stroke-width="7" stroke-linecap="round"><path d="M1130 830 h-80 M1140 720 h-80 M1170 610 h-80 M1220 500 h-80"/></g>
+<g><rect x="300" y="560" width="150" height="230" fill="#16202f" stroke="#33415e" stroke-width="5"/><rect x="322" y="586" width="106" height="70" fill="#0f1826" stroke="#42536f" stroke-width="4"/><rect x="360" y="600" width="30" height="44" rx="5" fill="${fl('beam')?'#8fe3ff':'#3a4558'}"/>${fl('beam')?'<circle cx="375" cy="622" r="40" fill="url(#ggl2)"/>':''}<text x="330" y="700" font-size="18" fill="#5d6a80" font-family="monospace">MASTER</text></g>
+<g><rect x="120" y="380" width="120" height="90" fill="#1c150c" stroke="#33251a" stroke-width="4"/><circle cx="180" cy="424" r="16" fill="none" stroke="#c9a95f" stroke-width="4"/><path d="M180 408 v-30 M180 440 v30 M164 424 h-30 M196 424 h30" stroke="#c9a95f" stroke-width="3"/></g>
+<g fill="#cfc3a2" opacity=".4"><path d="M700 700 h200 v14 h-200z"/><text x="716" y="756" font-size="26" fill="#4a5568" font-family="serif">AZURE LIGHT — EST. 1971</text></g>
+<path d="M1040 430 l60 -40 40 60" stroke="#33415e" stroke-width="4" fill="none"/>
+</svg>`,
+nav:[{to:'lhout',x:93,y:82,a:'▼'}],
+h:[
+ {x:26.5,y:68,w:10.5,h:16,t:{en:'Master switch',jp:'メインスイッチ'},mark:1,rep:1,act:()=>{
+   if(fl('beam')){say(T({en:'The switch is on. It will stay on until the sea lets go.',jp:'スイッチはon。海が諦めるまでonのままだろう。'}));return;}
+   if(!fl('genrun')){say(T({en:'The switch is dead. No current runs out here — the resort\'s heart, the generator, is still asleep.',jp:'スイッチは死んでいる。発電機——リゾートの心臓はまだ眠っている。'}));return false;}
+   if(!fl('breaker')){say(T({en:'No power on this line. Someone tripped the breaker down in the generator room.',jp:'この線に電流なし。発電機室でブレーカーが落とされている。'}));return false;}
+   sf('beam');sfxBeam();
+   say(T({en:'You throw the master switch. The great lens shivers, then turns, and a blade of light cuts the black bay open. Channel markers ignite, one after another, all the way to deep water.',jp:'メインを切る。大レンズが震え、回転し、光の刃が黒い湾を切り開く。航路ブイが深海まで次々に点火する。'}));
+   $('#scene').innerHTML=art('lhin');}},
+ {x:50,y:26,w:21,h:22,rep:1,t:{en:'The great lens',jp:'大レンズ'},mark:1,act:()=>say(T({en:'A first-order Fresnel lens, taller than you, built like a cathedral. Through it, the sea looks stitched with light.',jp:'一等フレネルレンズ——大聖堂のように建てられ、あなたより高い。これを透かすと、海は光で縫い合わされて見える。'}))},
+ {x:84,y:37,w:9,h:14,t:{en:'Spiral stair down',jp:'螺旋階段（下り）'},nav:'lhout'},
+ {x:14.5,y:46,w:8.5,h:11,rep:1,t:{en:'Keeper\'s log box',jp:'灯台守の記録箱'},mark:1,act:()=>say(T({en:'Brass fittings, spare wicks, and a logbook: “Oct 1998 — they are leaving. The resort closes but the LIGHT stays. It always stays. 741 nights and counting.” Someone kept this light for 741 nights after the resort died.',jp:'真鍮部品と予備芯、日誌：「1998年10月——彼らは去る。リゾートは閉まるが灯は残る。常に残る。741夜、カウント継続」。リゾートが死んだ後に741夜、誰かがこの灯を守った。'}))},
+ {x:52,y:80,w:11,h:5,rep:1,t:{en:'Plaque',jp:'銘板'},mark:1,act:()=>say(T({en:'“AZURE LIGHT — EST. 1971. The sea pays for everything; pay it back in light.”',jp:'「AZURE LIGHT — 1971年建設。海はすべてに値をつける。光で返せ」。'}))}
+]});
+/*END-ROOMS*/
+wireMenu();
+showTitle();
+</script>
+</body>
+</html>
